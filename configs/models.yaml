@@ -1,0 +1,108 @@
+models:
+  - id: simple/baseline
+    provider: simple
+    display_name: Simple Baseline Counter
+    short_name: Simple
+    counter: simple
+    tokenizer_name: null
+    input_price_per_1m_tokens: null
+    enabled: true
+
+  - id: openai/gpt-4o
+    provider: openai
+    display_name: GPT-4o
+    short_name: GPT-4o
+    counter: openai-tiktoken
+    tokenizer_name: o200k_base
+    input_price_per_1m_tokens: null
+    enabled: false
+
+  - id: openai/gpt-4o-mini
+    provider: openrouter
+    display_name: GPT-4o mini via OpenRouter
+    short_name: GPT-4o mini
+    counter: openrouter-usage
+    tokenizer_name: null
+    input_price_per_1m_tokens: null
+    enabled: false
+
+  - id: openai/gpt-5.5
+    provider: openrouter
+    display_name: GPT-5.5 via OpenRouter
+    short_name: GPT-5.5
+    counter: openrouter-usage
+    tokenizer_name: null
+    input_price_per_1m_tokens: null
+    enabled: false
+
+  - id: openai/gpt-5.4
+    provider: openrouter
+    display_name: GPT-5.4 via OpenRouter
+    short_name: GPT-5.4
+    counter: openrouter-usage
+    tokenizer_name: null
+    input_price_per_1m_tokens: null
+    enabled: false
+
+  - id: anthropic/claude-opus-4.7
+    provider: openrouter
+    display_name: Claude Opus 4.7 via OpenRouter
+    short_name: Claude Opus 4.7
+    counter: openrouter-usage
+    tokenizer_name: null
+    input_price_per_1m_tokens: null
+    enabled: false
+
+  - id: anthropic/claude-sonnet-4.6
+    provider: openrouter
+    display_name: Claude Sonnet 4.6 via OpenRouter
+    short_name: Claude Sonnet 4.6
+    counter: openrouter-usage
+    tokenizer_name: null
+    input_price_per_1m_tokens: null
+    enabled: false
+
+  - id: google/gemini-3.1-pro-preview
+    provider: openrouter
+    display_name: Gemini 3.1 Pro Preview via OpenRouter
+    short_name: Gemini 3.1 Pro
+    counter: openrouter-usage
+    tokenizer_name: null
+    input_price_per_1m_tokens: null
+    enabled: false
+
+  - id: qwen/qwen3.6-27b
+    provider: openrouter
+    display_name: Qwen3.6 27B via OpenRouter
+    short_name: Qwen3.6 27B
+    counter: openrouter-usage
+    tokenizer_name: null
+    input_price_per_1m_tokens: null
+    enabled: false
+
+  - id: moonshotai/kimi-k2.6
+    provider: openrouter
+    display_name: Kimi K2.6 via OpenRouter
+    short_name: Kimi K2.6
+    counter: openrouter-usage
+    tokenizer_name: null
+    input_price_per_1m_tokens: null
+    enabled: false
+
+  - id: google/gemini-3-flash-preview
+    provider: openrouter
+    display_name: Gemini 3 Flash Preview via OpenRouter
+    short_name: Gemini 3 Flash
+    counter: openrouter-usage
+    tokenizer_name: null
+    input_price_per_1m_tokens: null
+    enabled: false
+
+  - id: openai/gpt-oss-120b
+    provider: openrouter
+    display_name: GPT OSS 120B via OpenRouter
+    short_name: GPT OSS 120B
+    counter: openrouter-usage
+    tokenizer_name: null
+    input_price_per_1m_tokens: null
+    enabled: false

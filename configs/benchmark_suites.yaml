@@ -1,0 +1,74 @@
+suites:
+  - name: main_2026_04
+    description: Main April 2026 comparison candidates.
+    model_ids:
+      - openai/gpt-5.5
+      - openai/gpt-5.4
+      - anthropic/claude-opus-4.7
+      - anthropic/claude-sonnet-4.6
+      - google/gemini-3.1-pro-preview
+      - qwen/qwen3.6-27b
+      - moonshotai/kimi-k2.6
+
+  - name: budget_2026_04
+    description: Budget-oriented models for low-cost benchmark runs.
+    model_ids:
+      - google/gemini-3-flash-preview
+      - openai/gpt-4o-mini
+      - openai/gpt-oss-120b
+
+  - name: all_2026_04
+    description: All April 2026 comparison models without duplicates.
+    model_ids:
+      - openai/gpt-5.5
+      - openai/gpt-5.4
+      - anthropic/claude-opus-4.7
+      - anthropic/claude-sonnet-4.6
+      - google/gemini-3.1-pro-preview
+      - qwen/qwen3.6-27b
+      - moonshotai/kimi-k2.6
+      - google/gemini-3-flash-preview
+      - openai/gpt-4o-mini
+      - openai/gpt-oss-120b
+    charts:
+      - id: openai_gpt54_vs_gpt55_bar
+        type: two_model_bar
+        title: GPT-5.4 vs GPT-5.5 Language Token Efficiency
+        model_ids:
+          - openai/gpt-5.4
+          - openai/gpt-5.5
+        output_name: openai_gpt54_vs_gpt55_bar
+        sort_languages: by_lower_average_model
+        show_value_labels: true
+        legend_position: top
+
+      - id: anthropic_sonnet46_vs_opus47_bar
+        type: two_model_bar
+        title: Claude Sonnet 4.6 vs Claude Opus 4.7 Language Token Efficiency
+        model_ids:
+          - anthropic/claude-sonnet-4.6
+          - anthropic/claude-opus-4.7
+        output_name: anthropic_sonnet46_vs_opus47_bar
+        sort_languages: by_lower_average_model
+        show_value_labels: true
+        legend_position: top
+
+  - name: public_comparison_2026_04
+    description: Models selected for the public comparison table.
+    model_ids:
+      - openai/gpt-5.5
+      - anthropic/claude-opus-4.7
+      - google/gemini-3.1-pro-preview
+      - qwen/qwen3.6-27b
+      - moonshotai/kimi-k2.6
+    charts:
+      - id: openai_vs_anthropic_bar
+        type: two_model_bar
+        title: OpenAI vs Anthropic Language Token Efficiency
+        model_ids:
+          - openai/gpt-5.5
+          - anthropic/claude-opus-4.7
+        output_name: openai_vs_anthropic_bar
+        sort_languages: by_lower_average_model
+        show_value_labels: true
+        legend_position: top

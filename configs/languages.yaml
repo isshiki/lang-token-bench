@@ -1,0 +1,41 @@
+languages:
+  - code: en
+    name: English
+    plot_label: English
+    native_name: English
+    enabled: true
+  - code: ja
+    name: Japanese
+    plot_label: Japanese
+    native_name: 日本語
+    enabled: true
+  - code: zh
+    name: Chinese
+    plot_label: Chinese
+    native_name: 中文
+    enabled: true
+  - code: ko
+    name: Korean
+    plot_label: Korean
+    native_name: 한국어
+    enabled: true
+  - code: es
+    name: Spanish
+    plot_label: Spanish
+    native_name: Español
+    enabled: true
+  - code: fr
+    name: French
+    plot_label: French
+    native_name: Français
+    enabled: true
+  - code: ar
+    name: Arabic
+    plot_label: Arabic
+    native_name: العربية
+    enabled: true
+  - code: hi
+    name: Hindi
+    plot_label: Hindi
+    native_name: हिन्दी
+    enabled: true

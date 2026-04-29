@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lang-token-bench"
+version = "0.1.0"
+description = "A multilingual token efficiency benchmark across major LLMs."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [
+    { name = "Language Token Efficiency Benchmark contributors" },
+]
+dependencies = [
+    "python-dotenv>=1.0.0",
+    "PyYAML>=6.0.2",
+]
+
+[project.optional-dependencies]
+tiktoken = [
+    "tiktoken>=0.7.0",
+]
+openrouter = [
+    "httpx>=0.28.0",
+]
+viz = [
+    "matplotlib>=3.9.0",
+]
+
+[project.scripts]
+lang-token-bench = "lang_token_bench.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-p", "no:anyio"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lang_token_bench"]
