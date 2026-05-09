@@ -20,7 +20,10 @@ from lang_token_bench.config import (
     load_sample_texts,
 )
 from lang_token_bench.counters.base import CounterRequestError, CounterUnavailableError
-from lang_token_bench.counters.openrouter_usage import DEFAULT_MAX_OUTPUT_TOKENS
+from lang_token_bench.counters.openrouter_usage import (
+    DEFAULT_MAX_OUTPUT_TOKENS,
+    OpenRouterProviderRouting,
+)
 from lang_token_bench.env import load_project_env
 from lang_token_bench.openrouter_credits import (
     OpenRouterCreditsClient,
@@ -136,11 +139,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run only a specific sample text id from sample_texts.yaml",
     )
     run_parser.add_argument(
+        "--language-code",
+        action="append",
+        metavar="CODES",
+        help=(
+            "Run only specific language codes, comma-separated or repeated. "
+            "Example: --language-code en,hi"
+        ),
+    )
+    run_parser.add_argument(
         "--max-output-tokens",
         type=int,
         default=DEFAULT_MAX_OUTPUT_TOKENS,
         help="Completion token budget for OpenRouter usage requests",
     )
+    _add_openrouter_provider_routing_args(run_parser)
 
     run_suite_parser = subparsers.add_parser(
         "run-suite",
@@ -206,6 +219,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run only a specific sample text id from sample_texts.yaml",
     )
     run_suite_parser.add_argument(
+        "--language-code",
+        action="append",
+        metavar="CODES",
+        help=(
+            "Run only specific language codes, comma-separated or repeated. "
+            "Example: --language-code en,hi"
+        ),
+    )
+    run_suite_parser.add_argument(
         "--force",
         action="store_true",
         help="Re-run suite models even when complete saved run results already exist",
@@ -221,6 +243,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_MAX_OUTPUT_TOKENS,
         help="Completion token budget for OpenRouter usage requests",
     )
+    _add_openrouter_provider_routing_args(run_suite_parser)
 
     summarize_parser = subparsers.add_parser(
         "summarize",
@@ -320,6 +343,41 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _add_openrouter_provider_routing_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--provider-only",
+        action="append",
+        metavar="SLUGS",
+        help=(
+            "OpenRouter provider slugs to allow, comma-separated or repeated. "
+            "Example: --provider-only anthropic"
+        ),
+    )
+    parser.add_argument(
+        "--provider-ignore",
+        action="append",
+        metavar="SLUGS",
+        help=(
+            "OpenRouter provider slugs to ignore, comma-separated or repeated. "
+            "Example: --provider-ignore amazon-bedrock"
+        ),
+    )
+    parser.add_argument(
+        "--provider-order",
+        action="append",
+        metavar="SLUGS",
+        help=(
+            "OpenRouter provider slugs to prioritize, comma-separated or repeated. "
+            "Example: --provider-order anthropic,amazon-bedrock"
+        ),
+    )
+    parser.add_argument(
+        "--no-provider-fallbacks",
+        action="store_true",
+        help="Set OpenRouter provider.allow_fallbacks=false for the request",
+    )
+
+
 def main(argv: list[str] | None = None, *, load_env: bool = True) -> int:
     if load_env:
         load_project_env()
@@ -341,6 +399,7 @@ def main(argv: list[str] | None = None, *, load_env: bool = True) -> int:
 
 def _handle_run_command(args: argparse.Namespace) -> int:
     _validate_max_output_tokens(args.max_output_tokens)
+    provider_routing = _build_openrouter_provider_routing(args)
     plan = build_benchmark_plan(
         languages_path=args.languages,
         models_path=args.models,
@@ -348,11 +407,18 @@ def _handle_run_command(args: argparse.Namespace) -> int:
         counter_filter=args.counter,
         model_id_filter=args.model_id,
         text_id_filter=args.text_id,
+        language_code_filter=_parse_language_codes(args.language_code),
         limit=args.limit,
     )
+    _validate_provider_routing_scope(plan, provider_routing)
     api_backed_counter = _find_api_backed_counter(plan)
     if args.dry_run:
-        _print_dry_run(plan, args.limit, args.max_output_tokens)
+        _print_dry_run(
+            plan,
+            args.limit,
+            args.max_output_tokens,
+            provider_routing,
+        )
         return 0
     if api_backed_counter and not args.yes:
         raise ValueError(
@@ -364,12 +430,14 @@ def _handle_run_command(args: argparse.Namespace) -> int:
         plan,
         output_dir=args.output_dir,
         max_output_tokens=args.max_output_tokens,
+        provider_routing=provider_routing,
     )
     return 0
 
 
 def _handle_run_suite_command(args: argparse.Namespace) -> int:
     _validate_max_output_tokens(args.max_output_tokens)
+    provider_routing = _build_openrouter_provider_routing(args)
     suite = load_benchmark_suite(args.suite, args.suites)
     model_ids = _select_suite_model_ids(suite.model_ids, args.model_id)
     model_plans = [
@@ -381,6 +449,7 @@ def _handle_run_suite_command(args: argparse.Namespace) -> int:
                 models_path=args.models,
                 sample_texts_path=args.texts,
                 text_id_filter=args.text_id,
+                language_code_filter=_parse_language_codes(args.language_code),
                 limit=args.limit,
             ),
         )
@@ -391,7 +460,9 @@ def _handle_run_suite_command(args: argparse.Namespace) -> int:
         output_dir=args.output_dir,
         force=args.force,
     )
+    selected_plan = [item for model_plan in model_plans for item in model_plan.plan]
     combined_plan = [item for model_plan in run_model_plans for item in model_plan.plan]
+    _validate_provider_routing_scope(selected_plan, provider_routing)
 
     if args.dry_run:
         _print_suite_dry_run(
@@ -402,6 +473,7 @@ def _handle_run_suite_command(args: argparse.Namespace) -> int:
             limit=args.limit,
             force=args.force,
             max_output_tokens=args.max_output_tokens,
+            provider_routing=provider_routing,
         )
         return 0
 
@@ -454,6 +526,7 @@ def _handle_run_suite_command(args: argparse.Namespace) -> int:
                 model_plan.plan,
                 output_dir=args.output_dir,
                 max_output_tokens=args.max_output_tokens,
+                provider_routing=provider_routing,
             )
             models_completed.append(model_plan.model_id)
             run_ids.append(execution.run_id)
@@ -524,6 +597,59 @@ def _validate_max_output_tokens(max_output_tokens: int) -> None:
         raise ValueError("--max-output-tokens must be a positive integer.")
 
 
+def _build_openrouter_provider_routing(args: argparse.Namespace) -> OpenRouterProviderRouting:
+    routing = OpenRouterProviderRouting(
+        only=_parse_provider_slugs(getattr(args, "provider_only", None)),
+        ignore=_parse_provider_slugs(getattr(args, "provider_ignore", None)),
+        order=_parse_provider_slugs(getattr(args, "provider_order", None)),
+        allow_fallbacks=False if getattr(args, "no_provider_fallbacks", False) else None,
+    )
+    if routing.only and routing.ignore:
+        raise ValueError("--provider-only and --provider-ignore cannot be used together.")
+    return routing
+
+
+def _parse_provider_slugs(values: list[str] | None) -> tuple[str, ...]:
+    if not values:
+        return ()
+    slugs: list[str] = []
+    for value in values:
+        for slug in value.split(","):
+            normalized = slug.strip()
+            if normalized:
+                slugs.append(normalized)
+    if not slugs:
+        raise ValueError("Provider routing options require at least one provider slug.")
+    return tuple(_unique_preserve_order(slugs))
+
+
+def _parse_language_codes(values: list[str] | None) -> list[str] | None:
+    if not values:
+        return None
+    codes: list[str] = []
+    for value in values:
+        for code in value.split(","):
+            normalized = code.strip()
+            if normalized:
+                codes.append(normalized)
+    if not codes:
+        raise ValueError("--language-code requires at least one language code.")
+    return _unique_preserve_order(codes)
+
+
+def _validate_provider_routing_scope(
+    plan: list[BenchmarkPlanItem],
+    provider_routing: OpenRouterProviderRouting,
+) -> None:
+    if provider_routing.is_empty():
+        return
+    if not _find_openrouter_usage_counter(plan):
+        raise ValueError(
+            "OpenRouter provider routing options can only be used with "
+            "the openrouter-usage counter."
+        )
+
+
 def _build_suite_model_plan(
     *,
     model_id: str,
@@ -531,6 +657,7 @@ def _build_suite_model_plan(
     models_path: Path,
     sample_texts_path: Path,
     text_id_filter: str | None,
+    language_code_filter: list[str] | None,
     limit: int | None,
 ) -> list[BenchmarkPlanItem]:
     if limit is not None and limit < 1:
@@ -538,6 +665,16 @@ def _build_suite_model_plan(
 
     model = _resolve_suite_model(model_id, models_path)
     languages = [language for language in load_languages(languages_path) if language.enabled]
+    if language_code_filter is not None:
+        by_code = {language.code: language for language in languages}
+        missing = [code for code in language_code_filter if code not in by_code]
+        if missing:
+            available = ", ".join(language.code for language in languages)
+            raise ValueError(
+                f"No enabled languages found for language code(s): {', '.join(missing)}. "
+                f"Available enabled language codes: {available}"
+            )
+        languages = [by_code[code] for code in language_code_filter]
     sample_texts = load_sample_texts(sample_texts_path)
     if text_id_filter is not None:
         sample_texts = [text for text in sample_texts if text.id == text_id_filter]
@@ -673,6 +810,7 @@ def _execute_benchmark_plan(
     *,
     output_dir: Path,
     max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
+    provider_routing: OpenRouterProviderRouting | None = None,
 ) -> BenchmarkRunExecution:
     started_at_utc = _utc_now()
     run_model_ids = _unique_preserve_order(item.model.id for item in plan)
@@ -687,7 +825,11 @@ def _execute_benchmark_plan(
         run_dir = output_dir / "runs" / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
 
-    results = run_benchmark_plan(plan, max_output_tokens=max_output_tokens)
+    results = run_benchmark_plan(
+        plan,
+        max_output_tokens=max_output_tokens,
+        openrouter_provider_routing=provider_routing,
+    )
     csv_path = write_csv_report(results, output_dir / "results.csv")
     md_path = write_markdown_report(results, output_dir / "results.md")
     run_csv_path = None
@@ -716,6 +858,11 @@ def _execute_benchmark_plan(
             rows_executed=len(results),
             credits_before=credits_before,
             credits_after=credits_after,
+            provider_routing=(
+                provider_routing.to_payload()
+                if provider_routing and not provider_routing.is_empty()
+                else None
+            ),
         )
         summary_path = write_run_summary(credit_summary, output_dir / "run_summary.json")
         run_summary_path = None
@@ -874,6 +1021,7 @@ def _print_dry_run(
     plan: list[BenchmarkPlanItem],
     limit: int | None,
     max_output_tokens: int | None = None,
+    provider_routing: OpenRouterProviderRouting | None = None,
 ) -> None:
     models = _unique_preserve_order(item.model.id for item in plan)
     text_ids = _unique_preserve_order(item.sample_text.id for item in plan)
@@ -888,6 +1036,7 @@ def _print_dry_run(
         print(f"Limit: {limit}")
     if max_output_tokens is not None and _find_openrouter_usage_counter(plan):
         print(f"Max output tokens: {max_output_tokens}")
+    _print_openrouter_provider_routing(plan, provider_routing)
     print("Models:")
     for model_id in models:
         print(f"- {model_id}")
@@ -908,6 +1057,7 @@ def _print_suite_dry_run(
     limit: int | None,
     force: bool,
     max_output_tokens: int,
+    provider_routing: OpenRouterProviderRouting | None,
 ) -> None:
     selected_plan = [item for model_plan in selected_model_plans for item in model_plan.plan]
     plan = [item for model_plan in run_model_plans for item in model_plan.plan]
@@ -921,6 +1071,7 @@ def _print_suite_dry_run(
     print(f"Suite: {suite_name}")
     print(f"Force: {str(force).lower()}")
     print(f"Max output tokens: {max_output_tokens}")
+    _print_openrouter_provider_routing(selected_plan, provider_routing)
     print(f"Planned benchmark rows: {len(plan)}")
     if limit is not None:
         print(f"Limit: {limit}")
@@ -951,6 +1102,27 @@ def _print_suite_dry_run(
             print(f"- {model_id}: {row_count}")
     else:
         print("- none")
+
+
+def _print_openrouter_provider_routing(
+    plan: list[BenchmarkPlanItem],
+    provider_routing: OpenRouterProviderRouting | None,
+) -> None:
+    if provider_routing is None or provider_routing.is_empty():
+        return
+    if not _find_openrouter_usage_counter(plan):
+        return
+    print("OpenRouter provider routing:")
+    for key, value in provider_routing.to_payload().items():
+        print(f"- {key}: {_format_provider_routing_value(value)}")
+
+
+def _format_provider_routing_value(value: object) -> str:
+    if isinstance(value, list):
+        return ", ".join(str(item) for item in value)
+    if isinstance(value, bool):
+        return str(value).lower()
+    return str(value)
 
 
 def _unique_preserve_order(values) -> list[str]:

@@ -7,6 +7,7 @@ from lang_token_bench.counters.hf_tokenizer import HuggingFaceTokenizerCounter
 from lang_token_bench.counters.openai_tiktoken import OpenAITiktokenCounter
 from lang_token_bench.counters.openrouter_usage import (
     DEFAULT_MAX_OUTPUT_TOKENS,
+    OpenRouterProviderRouting,
     OpenRouterUsageCounter,
 )
 from lang_token_bench.counters.playwright_web import PlaywrightWebCounter
@@ -17,6 +18,7 @@ def create_counter(
     name: str,
     *,
     max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
+    openrouter_provider_routing: OpenRouterProviderRouting | None = None,
 ) -> TokenCounter:
     normalized = name.strip().lower()
     factories: dict[str, type[TokenCounter]] = {
@@ -32,7 +34,10 @@ def create_counter(
         "playwright_web": PlaywrightWebCounter,
     }
     if normalized in {"openrouter-usage", "openrouter_usage"}:
-        return OpenRouterUsageCounter(max_output_tokens=max_output_tokens)
+        return OpenRouterUsageCounter(
+            max_output_tokens=max_output_tokens,
+            provider_routing=openrouter_provider_routing,
+        )
     try:
         return factories[normalized]()
     except KeyError as exc:

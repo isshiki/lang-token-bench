@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import json
+from dataclasses import dataclass
 from typing import Any
 
 from lang_token_bench.counters.base import CounterRequestError, CounterUnavailableError
@@ -20,14 +21,43 @@ MAX_ERROR_DETAIL_LENGTH = 1000
 DEFAULT_MAX_OUTPUT_TOKENS = 16
 
 
+@dataclass(frozen=True)
+class OpenRouterProviderRouting:
+    only: tuple[str, ...] = ()
+    ignore: tuple[str, ...] = ()
+    order: tuple[str, ...] = ()
+    allow_fallbacks: bool | None = None
+
+    def to_payload(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if self.only:
+            payload["only"] = list(self.only)
+        if self.ignore:
+            payload["ignore"] = list(self.ignore)
+        if self.order:
+            payload["order"] = list(self.order)
+        if self.allow_fallbacks is not None:
+            payload["allow_fallbacks"] = self.allow_fallbacks
+        return payload
+
+    def is_empty(self) -> bool:
+        return not self.to_payload()
+
+
 class OpenRouterUsageCounter(TokenCounter):
     name = "openrouter-usage"
     counting_method = "openrouter_usage"
 
-    def __init__(self, *, max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS) -> None:
+    def __init__(
+        self,
+        *,
+        max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
+        provider_routing: OpenRouterProviderRouting | None = None,
+    ) -> None:
         if max_output_tokens < 1:
             raise ValueError("max_output_tokens must be a positive integer.")
         self.max_output_tokens = max_output_tokens
+        self.provider_routing = provider_routing or OpenRouterProviderRouting()
 
     def get_api_key(self) -> str:
         return os.environ.get("OPENROUTER_API_KEY", "").strip()
@@ -48,7 +78,7 @@ class OpenRouterUsageCounter(TokenCounter):
         }
 
     def build_payload(self, text: str, model: ModelConfig) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "model": model.id,
             "messages": [
                 {
@@ -59,6 +89,10 @@ class OpenRouterUsageCounter(TokenCounter):
             "max_tokens": self.max_output_tokens,
             "temperature": 0,
         }
+        provider_payload = self.provider_routing.to_payload()
+        if provider_payload:
+            payload["provider"] = provider_payload
+        return payload
 
     def extract_prompt_tokens(self, response_json: dict[str, Any]) -> int:
         usage = response_json.get("usage")

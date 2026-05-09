@@ -6,6 +6,7 @@ from lang_token_bench.counters.base import CounterUnavailableError
 from lang_token_bench.counters.openrouter_usage import (
     DEFAULT_MAX_OUTPUT_TOKENS,
     MAX_ERROR_DETAIL_LENGTH,
+    OpenRouterProviderRouting,
     OpenRouterUsageCounter,
     _format_http_error,
     _redact_secret,
@@ -30,6 +31,7 @@ def test_openrouter_payload_uses_observed_usage_method_shape() -> None:
     assert payload["model"] == "openai/gpt-4o"
     assert payload["max_tokens"] == DEFAULT_MAX_OUTPUT_TOKENS
     assert payload["messages"] == [{"role": "user", "content": "Hello"}]
+    assert "provider" not in payload
 
 
 def test_openrouter_payload_accepts_custom_max_output_tokens() -> None:
@@ -47,6 +49,33 @@ def test_openrouter_payload_accepts_custom_max_output_tokens() -> None:
     payload = counter.build_payload("Hello", model)
 
     assert payload["max_tokens"] == 32
+
+
+def test_openrouter_payload_accepts_provider_routing() -> None:
+    counter = OpenRouterUsageCounter(
+        provider_routing=OpenRouterProviderRouting(
+            only=("anthropic",),
+            order=("anthropic", "amazon-bedrock"),
+            allow_fallbacks=False,
+        )
+    )
+    model = ModelConfig(
+        id="anthropic/claude-opus-4.7",
+        provider="openrouter",
+        display_name="Claude Opus 4.7 via OpenRouter",
+        counter="openrouter-usage",
+        tokenizer_name=None,
+        input_price_per_1m_tokens=None,
+        enabled=False,
+    )
+
+    payload = counter.build_payload("Hello", model)
+
+    assert payload["provider"] == {
+        "only": ["anthropic"],
+        "order": ["anthropic", "amazon-bedrock"],
+        "allow_fallbacks": False,
+    }
 
 
 def test_openrouter_extract_prompt_tokens() -> None:

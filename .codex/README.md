@@ -25,8 +25,21 @@ For OpenRouter usage checks, preview first:
 uv run lang-token-bench run --counter openrouter-usage --dry-run --model-id openai/gpt-4o-mini --text-id short_instruction --limit 1
 ```
 
+Use `--language-code` when a smaller language subset is safer for paid or
+unstable API runs. Include `en` when ratios for another language must be
+computed in the same run.
+
 OpenRouter usage requests default to `--max-output-tokens 16`. Keep this value
 visible in dry-runs because some providers reject smaller completion budgets.
+
+OpenRouter provider routing options can help diagnose provider-specific
+failures. Use dry-runs first, then the smallest possible real request. For
+example:
+
+```powershell
+uv run lang-token-bench run --counter openrouter-usage --dry-run --model-id anthropic/claude-opus-4.7 --text-id short_instruction --limit 1 --provider-only anthropic --no-provider-fallbacks
+uv run lang-token-bench run --counter openrouter-usage --dry-run --model-id anthropic/claude-opus-4.7 --text-id short_instruction --limit 1 --provider-ignore amazon-bedrock
+```
 
 For suite runs, preview first:
 
@@ -81,6 +94,8 @@ Run-scoped OpenRouter artifacts are stored under `outputs/runs/<run_id>/`.
 OpenRouter Chat Completions errors may display safe response details such as
 `error.message`, `error.code`, `error.type`, and `error.metadata`. Never print
 API keys, Authorization headers, request headers, or full request payloads.
+Provider routing configuration is safe to display because it contains provider
+slugs only; it should be recorded in run summaries when used.
 
 Benchmark suites are configured in `configs/benchmark_suites.yaml`. Saved
 results can be summarized with:

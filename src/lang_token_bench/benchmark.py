@@ -13,7 +13,10 @@ from lang_token_bench.config import (
     load_sample_texts,
 )
 from lang_token_bench.counters import create_counter
-from lang_token_bench.counters.openrouter_usage import DEFAULT_MAX_OUTPUT_TOKENS
+from lang_token_bench.counters.openrouter_usage import (
+    DEFAULT_MAX_OUTPUT_TOKENS,
+    OpenRouterProviderRouting,
+)
 from lang_token_bench.pricing import estimate_input_cost_usd
 from lang_token_bench.schema import (
     BenchmarkPlanItem,
@@ -32,8 +35,10 @@ def run_benchmark(
     counter_filter: str | None = None,
     model_id_filter: str | None = None,
     text_id_filter: str | None = None,
+    language_code_filter: list[str] | None = None,
     limit: int | None = None,
     max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
+    openrouter_provider_routing: OpenRouterProviderRouting | None = None,
 ) -> list[BenchmarkResult]:
     plan = build_benchmark_plan(
         languages_path=languages_path,
@@ -42,21 +47,28 @@ def run_benchmark(
         counter_filter=counter_filter,
         model_id_filter=model_id_filter,
         text_id_filter=text_id_filter,
+        language_code_filter=language_code_filter,
         limit=limit,
     )
-    return run_benchmark_plan(plan, max_output_tokens=max_output_tokens)
+    return run_benchmark_plan(
+        plan,
+        max_output_tokens=max_output_tokens,
+        openrouter_provider_routing=openrouter_provider_routing,
+    )
 
 
 def run_benchmark_plan(
     plan: list[BenchmarkPlanItem],
     *,
     max_output_tokens: int = DEFAULT_MAX_OUTPUT_TOKENS,
+    openrouter_provider_routing: OpenRouterProviderRouting | None = None,
 ) -> list[BenchmarkResult]:
     timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     counters = {
         item.model.counter: create_counter(
             item.model.counter,
             max_output_tokens=max_output_tokens,
+            openrouter_provider_routing=openrouter_provider_routing,
         )
         for item in plan
     }
@@ -107,12 +119,14 @@ def build_benchmark_plan(
     counter_filter: str | None = None,
     model_id_filter: str | None = None,
     text_id_filter: str | None = None,
+    language_code_filter: list[str] | None = None,
     limit: int | None = None,
 ) -> list[BenchmarkPlanItem]:
     if limit is not None and limit < 1:
         raise ValueError("--limit must be a positive integer.")
 
     languages = [language for language in load_languages(languages_path) if language.enabled]
+    languages = _filter_languages_by_code(languages, language_code_filter)
     models = _select_models(load_models(models_path), counter_filter)
     models = _filter_models_by_id(models, model_id_filter)
     sample_texts = _filter_sample_texts_by_id(load_sample_texts(sample_texts_path), text_id_filter)
@@ -200,6 +214,24 @@ def _filter_sample_texts_by_id(
     return selected
 
 
+def _filter_languages_by_code(
+    languages: list[LanguageConfig],
+    language_code_filter: list[str] | None,
+) -> list[LanguageConfig]:
+    if language_code_filter is None:
+        return languages
+    requested = _unique_preserve_order(language_code_filter)
+    by_code = {language.code: language for language in languages}
+    missing = [code for code in requested if code not in by_code]
+    if missing:
+        available = ", ".join(language.code for language in languages)
+        raise ValueError(
+            f"No enabled languages found for language code(s): {', '.join(missing)}. "
+            f"Available enabled language codes: {available}"
+        )
+    return [by_code[code] for code in requested]
+
+
 def _validate_sample_contents(
     sample_text: SampleText,
     languages: list[LanguageConfig],
@@ -215,3 +247,14 @@ def _ratio_to_english(token_count: int, english_count: int | None) -> float | No
     if not english_count:
         return None
     return round(token_count / english_count, 6)
+
+
+def _unique_preserve_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        unique.append(value)
+    return unique

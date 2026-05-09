@@ -71,6 +71,7 @@ check OpenRouter credits before and after the benchmark.
 | Suite | Purpose |
 | --- | --- |
 | `public_comparison_2026_04` | Main public-facing comparison and figures |
+| `anthropic_comparison_2026_05` | Anthropic-only comparison across Haiku, Sonnet, Opus 4.6, and Opus 4.7 |
 | `all_2026_04` | All measured models, including extra comparisons |
 | `budget_2026_04` | Low-cost model checks |
 | `main_2026_04` | Major model candidates |
@@ -167,6 +168,19 @@ through the process environment or a local `.env` file:
 uv run lang-token-bench run --counter openrouter-usage --model-id openai/gpt-4o-mini --text-id short_instruction --limit 1 --yes
 ```
 
+To steer OpenRouter away from a provider or toward a specific provider, use
+provider routing options. For example, to test Anthropic-hosted Claude only:
+
+```powershell
+uv run lang-token-bench run --counter openrouter-usage --model-id anthropic/claude-opus-4.7 --text-id short_instruction --limit 1 --provider-only anthropic --no-provider-fallbacks --yes
+```
+
+To avoid Amazon Bedrock while still allowing OpenRouter to route elsewhere:
+
+```powershell
+uv run lang-token-bench run --counter openrouter-usage --model-id anthropic/claude-opus-4.7 --text-id short_instruction --limit 1 --provider-ignore amazon-bedrock --yes
+```
+
 When `openrouter-usage` runs, the CLI always checks OpenRouter credits before
 and after the benchmark. There is no skip option for this safety check.
 
@@ -186,10 +200,17 @@ uv run lang-token-bench run-suite --suite public_comparison_2026_04 --yes
 
 For OpenRouter models, `run-suite` also requires `--yes` before real API calls.
 Use `--model-id` to run one model from the suite and `--text-id` to run one
-sample text:
+sample text. Use `--language-code` to run a smaller language subset:
 
 ```powershell
 uv run lang-token-bench run-suite --suite budget_2026_04 --model-id openai/gpt-4o-mini --text-id short_instruction --yes
+uv run lang-token-bench run-suite --suite anthropic_comparison_2026_05 --model-id anthropic/claude-opus-4.6 --text-id long_news_summary_instruction --language-code en,hi --provider-only anthropic --no-provider-fallbacks --yes
+```
+
+Provider routing options also work with `run-suite`:
+
+```powershell
+uv run lang-token-bench run-suite --suite anthropic_comparison_2026_05 --model-id anthropic/claude-opus-4.7 --text-id short_instruction --provider-only anthropic --no-provider-fallbacks --force --yes
 ```
 
 By default, `run-suite` skips a model when saved run-scoped results already
@@ -473,6 +494,11 @@ The OpenRouter backend is intentionally separate from official tokenizer counter
 - Request shape: Chat Completions API with `max_tokens` set from
   `--max-output-tokens`, `temperature: 0`, and the sample text as the user
   message. The default is `16`.
+- Optional provider routing: `--provider-only`, `--provider-ignore`,
+  `--provider-order`, and `--no-provider-fallbacks` map to OpenRouter's
+  request-level `provider` object. Use these options to test whether a
+  provider such as `anthropic` succeeds when another route such as
+  `amazon-bedrock` is unstable.
 - Measured value: `usage.prompt_tokens` from the OpenRouter response.
 - Safety rule: OpenRouter models are disabled by default and real API requests require `--yes`.
 - Credit tracking: real `openrouter-usage` runs always fetch OpenRouter credits
@@ -484,8 +510,10 @@ small as practical. The default completion budget is `16` because some
 providers routed through OpenRouter reject smaller values even when the prompt
 token count is the only benchmark metric.
 
-Use `--dry-run`, `--limit`, `--model-id`, `--text-id`, and
-`--max-output-tokens` before any real usage run.
+Use `--dry-run`, `--limit`, `--model-id`, `--text-id`, `--language-code`, and
+`--max-output-tokens` before any real usage run. When provider routing is used,
+dry-runs print the routing configuration, and OpenRouter run summaries store it
+without any API key values.
 
 Credit checks use the OpenRouter Credits API at
 `https://openrouter.ai/api/v1/credits`, read `total_credits` and `total_usage`,

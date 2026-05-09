@@ -72,3 +72,22 @@ suites:
         sort_languages: by_lower_average_model
         show_value_labels: true
         legend_position: top
+
+  - name: anthropic_comparison_2026_05
+    description: Anthropic-only comparison across current Haiku, Sonnet, and Opus models.
+    model_ids:
+      - anthropic/claude-haiku-4.5
+      - anthropic/claude-sonnet-4.6
+      - anthropic/claude-opus-4.6
+      - anthropic/claude-opus-4.7
+    charts:
+      - id: anthropic_opus46_vs_opus47_bar
+        type: two_model_bar
+        title: Claude Opus 4.6 vs Claude Opus 4.7 Language Token Efficiency
+        model_ids:
+          - anthropic/claude-opus-4.6
+          - anthropic/claude-opus-4.7
+        output_name: anthropic_opus46_vs_opus47_bar
+        sort_languages: by_lower_average_model
+        show_value_labels: true
+        legend_position: top

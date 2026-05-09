@@ -28,10 +28,14 @@ CLI messages, comments, and commit messages.
   current workflow and should not be requested from users.
 - Do not run API-backed benchmarks unless the user explicitly asks.
 - Do not run standalone OpenRouter credit checks unless the user explicitly asks.
-- For the OpenRouter usage backend, prefer `--dry-run`, `--limit 1`, `--model-id`, and `--text-id`, and require `--yes` for real API calls.
+- For the OpenRouter usage backend, prefer `--dry-run`, `--limit 1`, `--model-id`, `--text-id`, and `--language-code`, and require `--yes` for real API calls.
 - Real `openrouter-usage` runs must always perform before/after OpenRouter credit checks.
 - OpenRouter usage requests default to `--max-output-tokens 16`; keep this
   explicit in dry-runs because some providers reject lower completion budgets.
+- OpenRouter provider routing may be used to diagnose provider-specific
+  failures. Prefer dry-runs first, then smallest possible `--yes` runs. For
+  example, use `--provider-only anthropic --no-provider-fallbacks` or
+  `--provider-ignore amazon-bedrock` when investigating Bedrock routing issues.
 
 ## Development Commands
 
@@ -44,6 +48,7 @@ uv sync --extra openrouter --extra viz
 uv run lang-token-bench run --counter simple
 uv run lang-token-bench run --counter openai-tiktoken
 uv run lang-token-bench run --counter openrouter-usage --dry-run --model-id openai/gpt-4o-mini --text-id short_instruction --limit 1
+uv run lang-token-bench run --counter openrouter-usage --dry-run --model-id anthropic/claude-opus-4.7 --text-id short_instruction --limit 1 --provider-only anthropic --no-provider-fallbacks
 uv run lang-token-bench run-suite --suite public_comparison_2026_04 --dry-run
 uv run lang-token-bench openrouter credits
 uv run lang-token-bench openrouter validate-models --suite main_2026_04
@@ -83,6 +88,10 @@ uv run pytest -p no:debugging
   never print API keys, Authorization headers, request headers, or full payloads.
 - OpenRouter usage benchmarks should keep completion output small while using
   `max_tokens: 16` by default for provider compatibility.
+- Provider routing options map to OpenRouter's request-level `provider` object:
+  `--provider-only`, `--provider-ignore`, `--provider-order`, and
+  `--no-provider-fallbacks`. Routing config is safe to print and store, but API
+  keys and headers are not.
 - Benchmark suites are configured in `configs/benchmark_suites.yaml`.
 - Summary generation reads saved result CSV files and filters by suite model IDs.
 - Use `summarize --debug-sources` when validating which run folder supplied a

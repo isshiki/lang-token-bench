@@ -282,6 +282,125 @@ def test_openrouter_run_max_output_tokens_option_updates_payload(
     assert [payload["max_tokens"] for payload in payloads] == [32]
 
 
+def test_openrouter_run_provider_routing_options_update_payload_and_summary(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    secret = "test-secret-key-value"
+    monkeypatch.setenv("OPENROUTER_API_KEY", secret)
+    payloads: list[dict] = []
+
+    def fake_fetch(self):
+        return OpenRouterCredits(total_credits=Decimal("10"), total_usage=Decimal("2"))
+
+    def fake_post_json(self, *, payload, headers, api_key=""):
+        payloads.append(payload)
+        return {"usage": {"prompt_tokens": 17}}
+
+    monkeypatch.setattr(OpenRouterCreditsClient, "fetch", fake_fetch)
+    monkeypatch.setattr(OpenRouterUsageCounter, "_post_json", fake_post_json)
+
+    exit_code = main(
+        [
+            "run",
+            "--counter",
+            "openrouter-usage",
+            "--model-id",
+            "anthropic/claude-opus-4.7",
+            "--text-id",
+            "short_instruction",
+            "--limit",
+            "1",
+            "--provider-only",
+            "anthropic",
+            "--no-provider-fallbacks",
+            "--yes",
+            "--output-dir",
+            str(tmp_path),
+        ],
+        load_env=False,
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert [payload["provider"] for payload in payloads] == [
+        {"only": ["anthropic"], "allow_fallbacks": False}
+    ]
+    summary = json.loads((tmp_path / "run_summary.json").read_text(encoding="utf-8"))
+    assert summary["provider_routing"] == {
+        "only": ["anthropic"],
+        "allow_fallbacks": False,
+    }
+    assert secret not in captured.out
+    assert secret not in captured.err
+
+
+def test_openrouter_provider_routing_dry_run_is_displayed(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def fail_credits_if_called(self):
+        raise AssertionError("Credits API should not be called during dry-run")
+
+    def fail_count_if_called(self, text, model=None):
+        raise AssertionError("Usage API should not be called during dry-run")
+
+    monkeypatch.setattr(OpenRouterCreditsClient, "fetch", fail_credits_if_called)
+    monkeypatch.setattr(OpenRouterUsageCounter, "count", fail_count_if_called)
+
+    exit_code = main(
+        [
+            "run",
+            "--counter",
+            "openrouter-usage",
+            "--model-id",
+            "anthropic/claude-opus-4.7",
+            "--text-id",
+            "short_instruction",
+            "--limit",
+            "1",
+            "--provider-ignore",
+            "amazon-bedrock",
+            "--dry-run",
+        ],
+        load_env=False,
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "OpenRouter provider routing:" in captured.out
+    assert "- ignore: amazon-bedrock" in captured.out
+
+
+def test_openrouter_provider_only_and_ignore_are_mutually_exclusive(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    exit_code = main(
+        [
+            "run",
+            "--counter",
+            "openrouter-usage",
+            "--model-id",
+            "anthropic/claude-opus-4.7",
+            "--text-id",
+            "short_instruction",
+            "--limit",
+            "1",
+            "--provider-only",
+            "anthropic",
+            "--provider-ignore",
+            "amazon-bedrock",
+            "--dry-run",
+        ],
+        load_env=False,
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "--provider-only and --provider-ignore cannot be used together." in captured.err
+
+
 def test_openrouter_credit_failure_stops_usage_run(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path,
@@ -518,6 +637,52 @@ def test_run_suite_max_output_tokens_option_updates_payload(
     assert [payload["max_tokens"] for payload in payloads] == [32]
 
 
+def test_run_suite_provider_routing_option_updates_payload(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    suite_path = tmp_path / "benchmark_suites.yaml"
+    _write_suite_config(suite_path, ["openrouter/model-a"])
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-secret-key-value")
+    payloads: list[dict] = []
+
+    def fake_fetch(self):
+        return OpenRouterCredits(total_credits=Decimal("10"), total_usage=Decimal("2"))
+
+    def fake_post_json(self, *, payload, headers, api_key=""):
+        payloads.append(payload)
+        return {"usage": {"prompt_tokens": 17}}
+
+    monkeypatch.setattr(OpenRouterCreditsClient, "fetch", fake_fetch)
+    monkeypatch.setattr(OpenRouterUsageCounter, "_post_json", fake_post_json)
+
+    exit_code = main(
+        [
+            "run-suite",
+            "--suite",
+            "test_suite",
+            "--suites",
+            str(suite_path),
+            "--text-id",
+            "short_instruction",
+            "--limit",
+            "1",
+            "--provider-order",
+            "anthropic,amazon-bedrock",
+            "--no-provider-fallbacks",
+            "--yes",
+            "--output-dir",
+            str(tmp_path),
+        ],
+        load_env=False,
+    )
+
+    assert exit_code == 0
+    assert [payload["provider"] for payload in payloads] == [
+        {"order": ["anthropic", "amazon-bedrock"], "allow_fallbacks": False}
+    ]
+
+
 def test_run_suite_model_id_filter_limits_suite_models(
     tmp_path,
     capsys: pytest.CaptureFixture[str],
@@ -547,6 +712,37 @@ def test_run_suite_model_id_filter_limits_suite_models(
     assert exit_code == 0
     assert "openrouter/model-a" not in captured.out
     assert "openrouter/model-b" in captured.out
+
+
+def test_run_suite_language_code_filter_limits_languages(
+    tmp_path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    suite_path = tmp_path / "benchmark_suites.yaml"
+    _write_suite_config(suite_path, ["openrouter/model-a"])
+
+    exit_code = main(
+        [
+            "run-suite",
+            "--suite",
+            "test_suite",
+            "--suites",
+            str(suite_path),
+            "--text-id",
+            "short_instruction",
+            "--language-code",
+            "en,hi",
+            "--dry-run",
+        ],
+        load_env=False,
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "Planned benchmark rows: 2" in captured.out
+    assert "- en (English)" in captured.out
+    assert "- hi (Hindi)" in captured.out
+    assert "- ja (Japanese)" not in captured.out
 
 
 def test_run_suite_skips_complete_saved_results_by_default(

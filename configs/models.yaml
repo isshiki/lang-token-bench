@@ -53,10 +53,28 @@ models:
     input_price_per_1m_tokens: null
     enabled: false
 
+  - id: anthropic/claude-opus-4.6
+    provider: openrouter
+    display_name: Claude Opus 4.6 via OpenRouter
+    short_name: Claude Opus 4.6
+    counter: openrouter-usage
+    tokenizer_name: null
+    input_price_per_1m_tokens: null
+    enabled: false
+
   - id: anthropic/claude-sonnet-4.6
     provider: openrouter
     display_name: Claude Sonnet 4.6 via OpenRouter
     short_name: Claude Sonnet 4.6
+    counter: openrouter-usage
+    tokenizer_name: null
+    input_price_per_1m_tokens: null
+    enabled: false
+
+  - id: anthropic/claude-haiku-4.5
+    provider: openrouter
+    display_name: Claude Haiku 4.5 via OpenRouter
+    short_name: Claude Haiku 4.5
     counter: openrouter-usage
     tokenizer_name: null
     input_price_per_1m_tokens: null

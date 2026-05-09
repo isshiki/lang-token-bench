@@ -34,6 +34,20 @@ def test_default_config_loads_expected_languages_and_models() -> None:
         and not model.enabled
         for model in models
     )
+    assert any(
+        model.id == "anthropic/claude-opus-4.6"
+        and model.counter == "openrouter-usage"
+        and model.short_name == "Claude Opus 4.6"
+        and not model.enabled
+        for model in models
+    )
+    assert any(
+        model.id == "anthropic/claude-haiku-4.5"
+        and model.counter == "openrouter-usage"
+        and model.short_name == "Claude Haiku 4.5"
+        and not model.enabled
+        for model in models
+    )
     assert next(language for language in languages if language.code == "ja").plot_label == "Japanese"
 
 
@@ -65,11 +79,13 @@ def test_benchmark_suites_load_expected_model_groups() -> None:
         "budget_2026_04",
         "public_comparison_2026_04",
         "all_2026_04",
+        "anthropic_comparison_2026_05",
     }
     main = load_benchmark_suite("main_2026_04")
     budget = load_benchmark_suite("budget_2026_04")
     all_suite = load_benchmark_suite("all_2026_04")
     public = load_benchmark_suite("public_comparison_2026_04")
+    anthropic = load_benchmark_suite("anthropic_comparison_2026_05")
     assert "openai/gpt-4o-mini" in budget.model_ids
     assert budget.model_ids
     expected_all = list(dict.fromkeys([*main.model_ids, *budget.model_ids]))
@@ -79,3 +95,10 @@ def test_benchmark_suites_load_expected_model_groups() -> None:
     assert public.charts[0].sort_languages == "by_lower_average_model"
     assert public.charts[0].show_value_labels is True
     assert public.charts[0].legend_position == "top"
+    assert anthropic.model_ids == [
+        "anthropic/claude-haiku-4.5",
+        "anthropic/claude-sonnet-4.6",
+        "anthropic/claude-opus-4.6",
+        "anthropic/claude-opus-4.7",
+    ]
+    assert anthropic.charts[0].id == "anthropic_opus46_vs_opus47_bar"

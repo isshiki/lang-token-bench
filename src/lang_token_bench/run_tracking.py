@@ -21,6 +21,7 @@ class OpenRouterCreditRunSummary:
     rows_executed: int
     credits_before: OpenRouterCredits
     credits_after: OpenRouterCredits
+    provider_routing: dict[str, object] | None = None
 
     @property
     def credits_used(self) -> Decimal:
@@ -65,6 +66,7 @@ RUN_SUMMARY_FIELDS = [
     "credits_after_usage",
     "credits_after_remaining",
     "credits_used",
+    "provider_routing",
 ]
 
 RUN_HISTORY_FIELDS = [
@@ -158,7 +160,7 @@ def _safe_filename_part(value: str) -> str:
     return safe or "unknown"
 
 
-def _summary_row(summary: OpenRouterCreditRunSummary) -> dict[str, str | int]:
+def _summary_row(summary: OpenRouterCreditRunSummary) -> dict[str, object]:
     return {
         "run_id": summary.run_id,
         "started_at_utc": summary.started_at_utc,
@@ -174,4 +176,5 @@ def _summary_row(summary: OpenRouterCreditRunSummary) -> dict[str, str | int]:
         "credits_after_usage": format_credit_amount(summary.credits_after.total_usage),
         "credits_after_remaining": format_credit_amount(summary.credits_after.remaining_credits),
         "credits_used": format_credit_amount(summary.credits_used),
+        "provider_routing": summary.provider_routing,
     }
