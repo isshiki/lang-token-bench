@@ -71,8 +71,9 @@ check OpenRouter credits before and after the benchmark.
 | Suite | Purpose |
 | --- | --- |
 | `public_comparison_2026_04` | Main public-facing comparison and figures |
-| `anthropic_comparison_2026_05` | Anthropic-only comparison across Haiku, Sonnet, Opus 4.6, and Opus 4.7 |
-| `gpt_comparison_2026_05` | GPT-family comparison across GPT-5.4, GPT-5.5, GPT-4o mini, and GPT OSS 120B |
+| `anthropic_comparison_2026_05` | Anthropic-only comparison ordered as Opus 4.7, Opus 4.6, Sonnet 4.6, and Haiku 4.5 |
+| `gpt_comparison_2026_05` | GPT-family comparison across GPT-5.5, GPT-5.4, GPT-4o mini, and GPT OSS 120B |
+| `frontier_comparison_2026_05` | Eight-model frontier comparison across GPT, Claude, Gemini, Qwen, and Kimi |
 | `all_2026_04` | All measured models, including extra comparisons |
 | `budget_2026_04` | Low-cost model checks |
 | `main_2026_04` | Major model candidates |
@@ -348,7 +349,9 @@ Do not print API keys in logs, reports, or errors.
 Start with the suite-scoped summary and figures:
 
 - `outputs/summaries/<suite_name>/summary_ratio_by_language_model.md`
+- `outputs/summaries/<suite_name>/summary_token_count_by_language_model.md`
 - `outputs/summaries/<suite_name>/figures/heatmap_ratio_by_language_model.svg`
+- `outputs/summaries/<suite_name>/figures/heatmap_token_count_by_language_model.svg`
 - `outputs/summaries/<suite_name>/figures/*.svg`
 
 For run provenance and detailed rows, check:
@@ -418,6 +421,9 @@ The top-level summary outputs are kept as latest files:
 outputs/summary_ratio_by_language_model.csv
 outputs/summary_ratio_by_language_model.md
 outputs/heatmap_ratio_language_model.csv
+outputs/summary_token_count_by_language_model.csv
+outputs/summary_token_count_by_language_model.md
+outputs/heatmap_token_count_language_model.csv
 ```
 
 Each `summarize --suite <suite_name>` run also writes suite-scoped files under
@@ -427,6 +433,9 @@ a safe folder name:
 outputs/summaries/<suite_name>/summary_ratio_by_language_model.csv
 outputs/summaries/<suite_name>/summary_ratio_by_language_model.md
 outputs/summaries/<suite_name>/heatmap_ratio_language_model.csv
+outputs/summaries/<suite_name>/summary_token_count_by_language_model.csv
+outputs/summaries/<suite_name>/summary_token_count_by_language_model.md
+outputs/summaries/<suite_name>/heatmap_token_count_language_model.csv
 ```
 
 Summary rows are languages, columns are model IDs, and values are average
@@ -436,6 +445,12 @@ an `Avg` column and final `Avg` row. The `Avg` row excludes English from the
 language average, the English row's `Avg` value is `1.0`, and the bottom-right
 average excludes English across all models.
 
+The token count summary files use the same language x model layout, but values
+are average observed input prompt token counts from saved benchmark rows. These
+absolute token counts are useful for understanding prompt size and cost
+exposure; they are affected by the underlying sample lengths and should be read
+alongside `ratio_to_english`.
+
 `heatmap_ratio_language_model.csv` is written in long format for charting:
 
 ```text
@@ -444,15 +459,19 @@ language_code,language_name,model_id,ratio_to_english,is_average
 
 It includes the same average cells and marks them with `is_average=true`, so a
 plotting script can include or filter average annotations explicitly.
+`heatmap_token_count_language_model.csv` follows the same long format with a
+`token_count` value column.
 
 The `plot` command reads the suite-scoped
-`summary_ratio_by_language_model.csv` and writes figures under:
+`summary_ratio_by_language_model.csv` and
+`summary_token_count_by_language_model.csv`, then writes figures under:
 
 ```text
 outputs/summaries/<suite_name>/figures/
 ```
 
-It always generates `heatmap_ratio_by_language_model.png` and `.svg`. Chart
+It always generates `heatmap_ratio_by_language_model.png` / `.svg` and
+`heatmap_token_count_by_language_model.png` / `.svg`. Chart
 definitions in `configs/benchmark_suites.yaml` can add extra figures. The
 `public_comparison_2026_04` suite includes an OpenAI vs Anthropic two-model bar
 chart based on OpenRouter observed usage, written as

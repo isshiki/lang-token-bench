@@ -7,6 +7,7 @@ from lang_token_bench.cli import main
 from lang_token_bench.plotting import (
     build_plot_labels,
     build_ratio_colormap_and_norm,
+    build_token_count_colormap,
     sort_bar_rows,
 )
 
@@ -24,6 +25,23 @@ def _write_summary_csv(path) -> None:
                 "ja,Japanese,1.4,1.6,1.5",
                 "fr,French,1.2,1.3,1.25",
                 "avg,Avg,1.3,1.45,1.375",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_token_count_summary_csv(path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "\n".join(
+            [
+                "language_code,language_name,model/a,model/b,Avg",
+                "en,English,100,110,105",
+                "ja,Japanese,140,160,150",
+                "fr,French,120,130,125",
+                "avg,Avg,120,133.33,126.67",
             ]
         )
         + "\n",
@@ -124,8 +142,11 @@ def test_plot_command_writes_heatmap_and_configured_bar(tmp_path, monkeypatch) -
     )
     summary_dir = tmp_path / "summaries" / "test_suite"
     _write_summary_csv(summary_dir / "summary_ratio_by_language_model.csv")
+    _write_token_count_summary_csv(summary_dir / "summary_token_count_by_language_model.csv")
     _write_summary_markdown(summary_dir / "summary_ratio_by_language_model.md")
+    _write_summary_markdown(summary_dir / "summary_token_count_by_language_model.md")
     _write_summary_markdown(tmp_path / "summary_ratio_by_language_model.md")
+    _write_summary_markdown(tmp_path / "summary_token_count_by_language_model.md")
     colormap_calls = []
     original_build_colormap = plotting.build_ratio_colormap_and_norm
 
@@ -161,6 +182,8 @@ def test_plot_command_writes_heatmap_and_configured_bar(tmp_path, monkeypatch) -
     assert second_exit_code == 0
     assert (figures_dir / "heatmap_ratio_by_language_model.png").exists()
     assert (figures_dir / "heatmap_ratio_by_language_model.svg").exists()
+    assert (figures_dir / "heatmap_token_count_by_language_model.png").exists()
+    assert (figures_dir / "heatmap_token_count_by_language_model.svg").exists()
     assert (figures_dir / "model_a_vs_b.png").exists()
     assert (figures_dir / "model_a_vs_b.svg").exists()
 
@@ -177,16 +200,30 @@ def test_plot_command_writes_heatmap_and_configured_bar(tmp_path, monkeypatch) -
     suite_markdown = (
         summary_dir / "summary_ratio_by_language_model.md"
     ).read_text(encoding="utf-8")
+    suite_token_count_markdown = (
+        summary_dir / "summary_token_count_by_language_model.md"
+    ).read_text(encoding="utf-8")
     latest_markdown = (tmp_path / "summary_ratio_by_language_model.md").read_text(
         encoding="utf-8"
     )
+    latest_token_count_markdown = (
+        tmp_path / "summary_token_count_by_language_model.md"
+    ).read_text(encoding="utf-8")
     assert suite_markdown.count("## Figures") == 1
+    assert suite_token_count_markdown.count("## Figures") == 1
     assert latest_markdown.count("## Figures") == 1
+    assert latest_token_count_markdown.count("## Figures") == 1
     assert "![Language x Model Token Ratio](figures/heatmap_ratio_by_language_model.svg)" in suite_markdown
+    assert "![Language x Model Input Token Count](figures/heatmap_token_count_by_language_model.svg)" in suite_markdown
+    assert "![Language x Model Input Token Count](figures/heatmap_token_count_by_language_model.svg)" in suite_token_count_markdown
     assert "![Model A vs Model B](figures/model_a_vs_b.svg)" in suite_markdown
     assert (
         "![Language x Model Token Ratio](summaries/test_suite/figures/heatmap_ratio_by_language_model.svg)"
         in latest_markdown
+    )
+    assert (
+        "![Language x Model Input Token Count](summaries/test_suite/figures/heatmap_token_count_by_language_model.svg)"
+        in latest_token_count_markdown
     )
 
 
@@ -208,6 +245,7 @@ def test_plot_command_uses_safe_suite_folder(tmp_path) -> None:
     )
     summary_dir = tmp_path / "summaries" / "unsafe-suite-..-name"
     _write_summary_csv(summary_dir / "summary_ratio_by_language_model.csv")
+    _write_token_count_summary_csv(summary_dir / "summary_token_count_by_language_model.csv")
 
     exit_code = main(
         [
@@ -227,6 +265,11 @@ def test_plot_command_uses_safe_suite_folder(tmp_path) -> None:
         summary_dir
         / "figures"
         / "heatmap_ratio_by_language_model.png"
+    ).exists()
+    assert (
+        summary_dir
+        / "figures"
+        / "heatmap_token_count_by_language_model.png"
     ).exists()
     assert not (tmp_path / "summaries" / "unsafe").exists()
 
@@ -261,6 +304,12 @@ def test_heatmap_colormap_uses_default_ratio_bounds() -> None:
     assert norm.vmin == pytest.approx(0.5)
     assert norm.vcenter == pytest.approx(1.0)
     assert norm.vmax == pytest.approx(2.0)
+
+
+def test_token_count_colormap_uses_soft_blue_green_scale() -> None:
+    cmap = build_token_count_colormap()
+
+    assert cmap.name == "token_count_soft_blue_green"
 
 
 def test_bar_rows_sort_by_lower_average_model_with_language_order_tie_break() -> None:

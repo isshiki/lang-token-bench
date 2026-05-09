@@ -74,39 +74,39 @@ suites:
         legend_position: top
 
   - name: anthropic_comparison_2026_05
-    description: Anthropic-only comparison across current Haiku, Sonnet, and Opus models.
+    description: Anthropic-only comparison ordered by current upper-tier Claude models.
     model_ids:
-      - anthropic/claude-haiku-4.5
-      - anthropic/claude-sonnet-4.6
-      - anthropic/claude-opus-4.6
       - anthropic/claude-opus-4.7
+      - anthropic/claude-opus-4.6
+      - anthropic/claude-sonnet-4.6
+      - anthropic/claude-haiku-4.5
     charts:
-      - id: anthropic_opus46_vs_opus47_bar
+      - id: anthropic_opus47_vs_opus46_bar
         type: two_model_bar
-        title: Claude Opus 4.6 vs Claude Opus 4.7 Language Token Efficiency
+        title: Claude Opus 4.7 vs Claude Opus 4.6 Language Token Efficiency
         model_ids:
-          - anthropic/claude-opus-4.6
           - anthropic/claude-opus-4.7
-        output_name: anthropic_opus46_vs_opus47_bar
+          - anthropic/claude-opus-4.6
+        output_name: anthropic_opus47_vs_opus46_bar
         sort_languages: by_lower_average_model
         show_value_labels: true
         legend_position: top
 
   - name: gpt_comparison_2026_05
-    description: GPT-family comparison across GPT-5.4, GPT-5.5, GPT-4o mini, and GPT OSS 120B.
+    description: GPT-family comparison across GPT-5.5, GPT-5.4, GPT-4o mini, and GPT OSS 120B.
     model_ids:
-      - openai/gpt-5.4
       - openai/gpt-5.5
+      - openai/gpt-5.4
       - openai/gpt-4o-mini
       - openai/gpt-oss-120b
     charts:
-      - id: gpt54_vs_gpt55_bar
+      - id: gpt55_vs_gpt54_bar
         type: two_model_bar
-        title: GPT-5.4 vs GPT-5.5 Language Token Efficiency
+        title: GPT-5.5 vs GPT-5.4 Language Token Efficiency
         model_ids:
-          - openai/gpt-5.4
           - openai/gpt-5.5
-        output_name: gpt54_vs_gpt55_bar
+          - openai/gpt-5.4
+        output_name: gpt55_vs_gpt54_bar
         sort_languages: by_lower_average_model
         show_value_labels: true
         legend_position: top
@@ -121,3 +121,15 @@ suites:
         sort_languages: by_lower_average_model
         show_value_labels: true
         legend_position: top
+
+  - name: frontier_comparison_2026_05
+    description: Eight-model frontier comparison excluding lower-cost and extra models.
+    model_ids:
+      - openai/gpt-5.5
+      - openai/gpt-5.4
+      - anthropic/claude-opus-4.7
+      - anthropic/claude-opus-4.6
+      - anthropic/claude-sonnet-4.6
+      - google/gemini-3.1-pro-preview
+      - qwen/qwen3.6-27b
+      - moonshotai/kimi-k2.6

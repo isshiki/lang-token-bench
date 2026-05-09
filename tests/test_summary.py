@@ -79,16 +79,28 @@ def test_summarize_command_writes_suite_outputs(tmp_path) -> None:
     summary_csv = tmp_path / "summary_ratio_by_language_model.csv"
     summary_md = tmp_path / "summary_ratio_by_language_model.md"
     heatmap_csv = tmp_path / "heatmap_ratio_language_model.csv"
+    token_count_csv = tmp_path / "summary_token_count_by_language_model.csv"
+    token_count_md = tmp_path / "summary_token_count_by_language_model.md"
+    token_count_heatmap_csv = tmp_path / "heatmap_token_count_language_model.csv"
     suite_summary_dir = tmp_path / "summaries" / "test_suite"
     suite_summary_csv = suite_summary_dir / "summary_ratio_by_language_model.csv"
     suite_summary_md = suite_summary_dir / "summary_ratio_by_language_model.md"
     suite_heatmap_csv = suite_summary_dir / "heatmap_ratio_language_model.csv"
+    suite_token_count_csv = suite_summary_dir / "summary_token_count_by_language_model.csv"
+    suite_token_count_md = suite_summary_dir / "summary_token_count_by_language_model.md"
+    suite_token_count_heatmap_csv = suite_summary_dir / "heatmap_token_count_language_model.csv"
     assert summary_csv.exists()
     assert summary_md.exists()
     assert heatmap_csv.exists()
+    assert token_count_csv.exists()
+    assert token_count_md.exists()
+    assert token_count_heatmap_csv.exists()
     assert suite_summary_csv.exists()
     assert suite_summary_md.exists()
     assert suite_heatmap_csv.exists()
+    assert suite_token_count_csv.exists()
+    assert suite_token_count_md.exists()
+    assert suite_token_count_heatmap_csv.exists()
 
     with summary_csv.open("r", encoding="utf-8", newline="") as file:
         rows = list(csv.DictReader(file))
@@ -125,6 +137,29 @@ def test_summarize_command_writes_suite_outputs(tmp_path) -> None:
         and row["is_average"] == "true"
         for row in heatmap_rows
     )
+
+    with token_count_csv.open("r", encoding="utf-8", newline="") as file:
+        token_count_rows = list(csv.DictReader(file))
+    token_count_english = next(row for row in token_count_rows if row["language_code"] == "en")
+    assert token_count_english["simple/baseline"]
+    token_count_text = token_count_md.read_text(encoding="utf-8")
+    assert "input prompt token counts" in token_count_text
+
+    with token_count_heatmap_csv.open("r", encoding="utf-8", newline="") as file:
+        token_count_heatmap_rows = list(csv.DictReader(file))
+    assert {
+        "language_code",
+        "language_name",
+        "model_id",
+        "token_count",
+        "is_average",
+    } == set(token_count_heatmap_rows[0])
+    assert any(
+        row["language_code"] == "avg"
+        and row["model_id"] == "Avg"
+        and row["is_average"] == "true"
+        for row in token_count_heatmap_rows
+    )
     assert any(
         row["language_code"] == "en"
         and row["model_id"] == "Avg"
@@ -154,11 +189,18 @@ def test_summarize_command_falls_back_to_latest_results(tmp_path) -> None:
 
     assert exit_code == 0
     assert (tmp_path / "summary_ratio_by_language_model.csv").exists()
+    assert (tmp_path / "summary_token_count_by_language_model.csv").exists()
     assert (
         tmp_path
         / "summaries"
         / "test_suite"
         / "summary_ratio_by_language_model.csv"
+    ).exists()
+    assert (
+        tmp_path
+        / "summaries"
+        / "test_suite"
+        / "summary_token_count_by_language_model.csv"
     ).exists()
 
 
@@ -201,6 +243,12 @@ def test_summarize_suite_name_is_sanitized_for_output_path(tmp_path) -> None:
         / "summaries"
         / safe_name
         / "summary_ratio_by_language_model.csv"
+    ).exists()
+    assert (
+        tmp_path
+        / "summaries"
+        / safe_name
+        / "summary_token_count_by_language_model.csv"
     ).exists()
     assert not (tmp_path / "summaries" / "unsafe").exists()
 

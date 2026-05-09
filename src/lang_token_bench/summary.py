@@ -14,6 +14,7 @@ class SummaryRow:
     language_code: str
     language_name: str
     ratios_by_model: dict[str, float | None]
+    token_counts_by_model: dict[str, float | None]
 
 
 @dataclass(frozen=True)
@@ -28,9 +29,15 @@ class SummaryReportPaths:
     latest_csv: Path
     latest_markdown: Path
     latest_heatmap_csv: Path
+    latest_token_count_csv: Path
+    latest_token_count_markdown: Path
+    latest_token_count_heatmap_csv: Path
     suite_csv: Path
     suite_markdown: Path
     suite_heatmap_csv: Path
+    suite_token_count_csv: Path
+    suite_token_count_markdown: Path
+    suite_token_count_heatmap_csv: Path
 
 
 @dataclass(frozen=True)
@@ -100,28 +107,36 @@ def summarize_suite_results(
         raise ValueError(f"No saved results found for suite '{suite.name}'.")
 
     languages = [language for language in load_languages(languages_path) if language.enabled]
-    grouped: dict[tuple[str, str], list[float]] = {}
+    ratio_grouped: dict[tuple[str, str], list[float]] = {}
+    token_count_grouped: dict[tuple[str, str], list[int]] = {}
     for result in selected:
-        grouped.setdefault((result.language_code, result.model_id), []).append(
+        ratio_grouped.setdefault((result.language_code, result.model_id), []).append(
             float(result.ratio_to_english)
+        )
+        token_count_grouped.setdefault((result.language_code, result.model_id), []).append(
+            result.token_count
         )
 
     rows: list[SummaryRow] = []
     for language in languages:
         ratios_by_model: dict[str, float | None] = {}
+        token_counts_by_model: dict[str, float | None] = {}
         for model_id in suite.model_ids:
-            values = grouped.get((language.code, model_id), [])
+            values = ratio_grouped.get((language.code, model_id), [])
             if not values:
                 ratios_by_model[model_id] = None
             elif language.code == "en":
                 ratios_by_model[model_id] = 1.0
             else:
                 ratios_by_model[model_id] = round(sum(values) / len(values), 6)
+            token_counts = token_count_grouped.get((language.code, model_id), [])
+            token_counts_by_model[model_id] = _average_token_counts(token_counts)
         rows.append(
             SummaryRow(
                 language_code=language.code,
                 language_name=language.name,
                 ratios_by_model=ratios_by_model,
+                token_counts_by_model=token_counts_by_model,
             )
         )
 
@@ -254,24 +269,42 @@ def write_summary_reports(summary: SummaryTable, output_dir: Path) -> SummaryRep
     csv_path = output_dir / "summary_ratio_by_language_model.csv"
     md_path = output_dir / "summary_ratio_by_language_model.md"
     heatmap_path = output_dir / "heatmap_ratio_language_model.csv"
+    token_count_csv_path = output_dir / "summary_token_count_by_language_model.csv"
+    token_count_md_path = output_dir / "summary_token_count_by_language_model.md"
+    token_count_heatmap_path = output_dir / "heatmap_token_count_language_model.csv"
     suite_dir = output_dir / "summaries" / safe_summary_suite_name(summary.suite_name)
     suite_csv_path = suite_dir / "summary_ratio_by_language_model.csv"
     suite_md_path = suite_dir / "summary_ratio_by_language_model.md"
     suite_heatmap_path = suite_dir / "heatmap_ratio_language_model.csv"
+    suite_token_count_csv_path = suite_dir / "summary_token_count_by_language_model.csv"
+    suite_token_count_md_path = suite_dir / "summary_token_count_by_language_model.md"
+    suite_token_count_heatmap_path = suite_dir / "heatmap_token_count_language_model.csv"
 
     _write_summary_csv(summary, csv_path)
     _write_summary_markdown(summary, md_path)
     _write_heatmap_csv(summary, heatmap_path)
+    _write_token_count_summary_csv(summary, token_count_csv_path)
+    _write_token_count_summary_markdown(summary, token_count_md_path)
+    _write_token_count_heatmap_csv(summary, token_count_heatmap_path)
     _write_summary_csv(summary, suite_csv_path)
     _write_summary_markdown(summary, suite_md_path)
     _write_heatmap_csv(summary, suite_heatmap_path)
+    _write_token_count_summary_csv(summary, suite_token_count_csv_path)
+    _write_token_count_summary_markdown(summary, suite_token_count_md_path)
+    _write_token_count_heatmap_csv(summary, suite_token_count_heatmap_path)
     return SummaryReportPaths(
         latest_csv=csv_path,
         latest_markdown=md_path,
         latest_heatmap_csv=heatmap_path,
+        latest_token_count_csv=token_count_csv_path,
+        latest_token_count_markdown=token_count_md_path,
+        latest_token_count_heatmap_csv=token_count_heatmap_path,
         suite_csv=suite_csv_path,
         suite_markdown=suite_md_path,
         suite_heatmap_csv=suite_heatmap_path,
+        suite_token_count_csv=suite_token_count_csv_path,
+        suite_token_count_markdown=suite_token_count_md_path,
+        suite_token_count_heatmap_csv=suite_token_count_heatmap_path,
     )
 
 
@@ -300,6 +333,32 @@ def _write_summary_csv(summary: SummaryTable, path: Path) -> Path:
                 }
             )
         writer.writerow(_average_summary_row(summary))
+    return path
+
+
+def _write_token_count_summary_csv(summary: SummaryTable, path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = ["language_code", "language_name", *summary.model_ids, AVG_LABEL]
+    with path.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in summary.rows:
+            writer.writerow(
+                {
+                    "language_code": row.language_code,
+                    "language_name": row.language_name,
+                    **{
+                        model_id: _format_optional_token_count(
+                            row.token_counts_by_model[model_id]
+                        )
+                        for model_id in summary.model_ids
+                    },
+                    AVG_LABEL: _format_optional_token_count(
+                        _token_count_row_average(summary, row)
+                    ),
+                }
+            )
+        writer.writerow(_average_token_count_summary_row(summary))
     return path
 
 
@@ -363,6 +422,68 @@ def _write_heatmap_csv(summary: SummaryTable, path: Path) -> Path:
     return path
 
 
+def _write_token_count_heatmap_csv(summary: SummaryTable, path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "language_code",
+        "language_name",
+        "model_id",
+        "token_count",
+        "is_average",
+    ]
+    with path.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in summary.rows:
+            for model_id in summary.model_ids:
+                writer.writerow(
+                    {
+                        "language_code": row.language_code,
+                        "language_name": row.language_name,
+                        "model_id": model_id,
+                        "token_count": _format_optional_token_count(
+                            row.token_counts_by_model[model_id]
+                        ),
+                        "is_average": "false",
+                    }
+                )
+            writer.writerow(
+                {
+                    "language_code": row.language_code,
+                    "language_name": row.language_name,
+                    "model_id": AVG_LABEL,
+                    "token_count": _format_optional_token_count(
+                        _token_count_row_average(summary, row)
+                    ),
+                    "is_average": "true",
+                }
+            )
+        for model_id in summary.model_ids:
+            writer.writerow(
+                {
+                    "language_code": "avg",
+                    "language_name": AVG_LABEL,
+                    "model_id": model_id,
+                    "token_count": _format_optional_token_count(
+                        _token_count_model_average(summary, model_id)
+                    ),
+                    "is_average": "true",
+                }
+            )
+        writer.writerow(
+            {
+                "language_code": "avg",
+                "language_name": AVG_LABEL,
+                "model_id": AVG_LABEL,
+                "token_count": _format_optional_token_count(
+                    _token_count_overall_average(summary)
+                ),
+                "is_average": "true",
+            }
+        )
+    return path
+
+
 def _write_summary_markdown(summary: SummaryTable, path: Path) -> Path:
     lines = [
         "# Language Token Efficiency Benchmark Summary",
@@ -412,6 +533,68 @@ def _write_summary_markdown(summary: SummaryTable, path: Path) -> Path:
             "",
             "Values are average `ratio_to_english` by language and model across saved text records.",
             "English is shown as 1.0 when results are available.",
+        ]
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def _write_token_count_summary_markdown(summary: SummaryTable, path: Path) -> Path:
+    lines = [
+        "# Language Token Efficiency Benchmark Token Count Summary",
+        "",
+        f"Suite: `{summary.suite_name}`",
+        "",
+        "| Language Code | Language Name | "
+        + " | ".join(summary.model_ids)
+        + f" | {AVG_LABEL} |",
+        "| --- | --- | "
+        + " | ".join("---:" for _ in [*summary.model_ids, AVG_LABEL])
+        + " |",
+    ]
+    for row in summary.rows:
+        lines.append(
+            "| {code} | {name} | {values} |".format(
+                code=row.language_code,
+                name=row.language_name,
+                values=" | ".join(
+                    [
+                        *(
+                            _format_markdown_token_count(
+                                row.token_counts_by_model[model_id]
+                            )
+                            for model_id in summary.model_ids
+                        ),
+                        _format_markdown_token_count(
+                            _token_count_row_average(summary, row)
+                        ),
+                    ]
+                ),
+            )
+        )
+    lines.append(
+        "| {code} | {name} | {values} |".format(
+            code="avg",
+            name=AVG_LABEL,
+            values=" | ".join(
+                [
+                    *(
+                        _format_markdown_token_count(
+                            _token_count_model_average(summary, model_id)
+                        )
+                        for model_id in summary.model_ids
+                    ),
+                    _format_markdown_token_count(_token_count_overall_average(summary)),
+                ]
+            ),
+        )
+    )
+    lines.extend(
+        [
+            "",
+            "Values are average observed input prompt token counts by language and model across saved text records.",
+            "They show absolute prompt size, not the ratio to English.",
         ]
     )
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -539,6 +722,20 @@ def _format_markdown_ratio(value: float | None) -> str:
     return f"{value:.2f}x"
 
 
+def _format_optional_token_count(value: float | None) -> str:
+    if value is None:
+        return ""
+    if value.is_integer():
+        return str(int(value))
+    return f"{value:.2f}".rstrip("0").rstrip(".")
+
+
+def _format_markdown_token_count(value: float | None) -> str:
+    if value is None:
+        return ""
+    return f"{value:,.0f}"
+
+
 def _average_summary_row(summary: SummaryTable) -> dict[str, str]:
     return {
         "language_code": "avg",
@@ -551,6 +748,20 @@ def _average_summary_row(summary: SummaryTable) -> dict[str, str]:
     }
 
 
+def _average_token_count_summary_row(summary: SummaryTable) -> dict[str, str]:
+    return {
+        "language_code": "avg",
+        "language_name": AVG_LABEL,
+        **{
+            model_id: _format_optional_token_count(
+                _token_count_model_average(summary, model_id)
+            )
+            for model_id in summary.model_ids
+        },
+        AVG_LABEL: _format_optional_token_count(_token_count_overall_average(summary)),
+    }
+
+
 def _row_average(summary: SummaryTable, row: SummaryRow) -> float | None:
     if row.language_code == "en":
         return 1.0
@@ -558,6 +769,34 @@ def _row_average(summary: SummaryTable, row: SummaryRow) -> float | None:
         row.ratios_by_model[model_id]
         for model_id in summary.model_ids
         if row.ratios_by_model[model_id] is not None
+    ]
+    return _average(values)
+
+
+def _token_count_row_average(summary: SummaryTable, row: SummaryRow) -> float | None:
+    values = [
+        row.token_counts_by_model[model_id]
+        for model_id in summary.model_ids
+        if row.token_counts_by_model[model_id] is not None
+    ]
+    return _average(values)
+
+
+def _token_count_model_average(summary: SummaryTable, model_id: str) -> float | None:
+    values = [
+        row.token_counts_by_model[model_id]
+        for row in summary.rows
+        if row.token_counts_by_model[model_id] is not None
+    ]
+    return _average(values)
+
+
+def _token_count_overall_average(summary: SummaryTable) -> float | None:
+    values = [
+        row.token_counts_by_model[model_id]
+        for row in summary.rows
+        for model_id in summary.model_ids
+        if row.token_counts_by_model[model_id] is not None
     ]
     return _average(values)
 
@@ -586,3 +825,9 @@ def _average(values: list[float | None]) -> float | None:
     if not numeric_values:
         return None
     return round(sum(numeric_values) / len(numeric_values), 6)
+
+
+def _average_token_counts(values: list[int]) -> float | None:
+    if not values:
+        return None
+    return round(sum(values) / len(values), 6)

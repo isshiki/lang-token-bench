@@ -120,6 +120,8 @@ are written under `outputs/summaries/<suite_name>/` using a safe folder name.
 Summary ratio CSV/Markdown include an `Avg` column and final `Avg` row. The
 heatmap CSV is long format and uses `is_average` to mark average cells.
 Plot outputs are written under `outputs/summaries/<suite_name>/figures/`.
+Summaries also include token count CSV/Markdown outputs and a token count
+heatmap for average observed input prompt tokens.
 Plots should use model `short_name` and language `plot_label` from the config
 files when present.
 Heatmaps use a diverging ratio scale centered on `1.0`. Two-model bar charts

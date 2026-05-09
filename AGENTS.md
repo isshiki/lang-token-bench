@@ -100,8 +100,11 @@ uv run pytest -p no:debugging
   `outputs/summaries/<suite_name>/` using a safe folder name.
 - Summary ratio CSV/Markdown include an `Avg` column and final `Avg` row;
   average rows exclude English. Heatmap CSV is long format with `is_average`.
+- Summary generation also writes token count CSV/Markdown and token count
+  heatmap CSV files using average observed input prompt token counts.
 - Plot generation reads suite-scoped summary CSV files and writes figures under
   `outputs/summaries/<suite_name>/figures/`; it requires `uv sync --extra viz`.
+- Plot generation should include both ratio and input-token-count heatmaps.
 - Suite chart definitions live in `configs/benchmark_suites.yaml`.
 - Plot labels should come from `configs/models.yaml` `short_name` and
   `configs/languages.yaml` `plot_label` with sensible fallbacks.

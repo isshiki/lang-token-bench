@@ -52,13 +52,20 @@ def plot_suite_figures(
 ) -> list[PlotOutput]:
     summary_dir = output_dir / "summaries" / safe_summary_suite_name(suite.name)
     summary_csv_path = summary_dir / "summary_ratio_by_language_model.csv"
+    token_count_summary_csv_path = summary_dir / "summary_token_count_by_language_model.csv"
     if not summary_csv_path.exists():
         raise ValueError(
             f"Summary CSV not found: {summary_csv_path}. "
             f"Run: uv run lang-token-bench summarize --suite {suite.name}"
         )
+    if not token_count_summary_csv_path.exists():
+        raise ValueError(
+            f"Token count summary CSV not found: {token_count_summary_csv_path}. "
+            f"Run: uv run lang-token-bench summarize --suite {suite.name}"
+        )
 
     summary_csv = load_summary_csv(summary_csv_path)
+    token_count_summary_csv = load_summary_csv(token_count_summary_csv_path)
     labels = build_plot_labels(models_path=models_path, languages_path=languages_path)
     figures_dir = summary_dir / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)
@@ -66,6 +73,11 @@ def plot_suite_figures(
     outputs = [
         _plot_heatmap(
             summary_csv=summary_csv,
+            labels=labels,
+            figures_dir=figures_dir,
+        ),
+        _plot_token_count_heatmap(
+            summary_csv=token_count_summary_csv,
             labels=labels,
             figures_dir=figures_dir,
         )
@@ -165,6 +177,72 @@ def _plot_heatmap(
         markdown_heading="Language x Model Token Ratio",
         alt_text="Language x Model Token Ratio",
         plt=plt,
+    )
+
+
+def _plot_token_count_heatmap(
+    *,
+    summary_csv: SummaryCsv,
+    labels: PlotLabels,
+    figures_dir: Path,
+) -> PlotOutput:
+    plt = _load_pyplot()
+    model_ids = [*summary_csv.model_ids, "Avg"]
+    model_labels = [_format_model_label(model_id, labels) for model_id in model_ids]
+    language_labels = [
+        _format_language_label(row, labels)
+        for row in summary_csv.rows
+    ]
+    values = [
+        [_parse_ratio(row.get(model_id, "")) for model_id in model_ids]
+        for row in summary_csv.rows
+    ]
+
+    fig_width = max(9.0, 1.25 * len(model_ids) + 2.5)
+    fig_height = max(5.5, 0.55 * len(language_labels) + 2.5)
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    image = ax.imshow(values, cmap=build_token_count_colormap(), aspect="auto")
+    fig.colorbar(image, ax=ax, label="Input prompt tokens")
+
+    ax.set_xticks(range(len(model_ids)))
+    ax.set_xticklabels(model_labels, rotation=35, ha="left")
+    ax.tick_params(top=True, bottom=False, labeltop=True, labelbottom=False)
+    ax.set_yticks(range(len(language_labels)))
+    ax.set_yticklabels(language_labels)
+
+    for row_index, row_values in enumerate(values):
+        for col_index, value in enumerate(row_values):
+            label = "" if math.isnan(value) else f"{value:,.0f}"
+            ax.text(col_index, row_index, label, ha="center", va="center", fontsize=8)
+
+    return _save_figure(
+        fig=fig,
+        figures_dir=figures_dir,
+        output_name="heatmap_token_count_by_language_model",
+        label="token count heatmap",
+        markdown_heading="Language x Model Input Token Count",
+        alt_text="Language x Model Input Token Count",
+        plt=plt,
+    )
+
+
+def build_token_count_colormap():
+    try:
+        from matplotlib.colors import LinearSegmentedColormap
+    except ImportError as exc:
+        raise CounterUnavailableError(PLOT_INSTALL_MESSAGE) from exc
+
+    return LinearSegmentedColormap.from_list(
+        "token_count_soft_blue_green",
+        [
+            "#F7FCF0",
+            "#E0F3DB",
+            "#CCEBC5",
+            "#A8DDB5",
+            "#7BCCC4",
+            "#4EB3D3",
+            "#5A9FCD",
+        ],
     )
 
 
@@ -431,10 +509,32 @@ def _update_summary_markdown_files(
             _build_figures_section(outputs, path_prefix="figures"),
         )
 
+    suite_token_count_md_path = (
+        output_dir
+        / "summaries"
+        / safe_suite_name
+        / "summary_token_count_by_language_model.md"
+    )
+    if suite_token_count_md_path.exists():
+        _upsert_figures_section(
+            suite_token_count_md_path,
+            _build_figures_section(outputs, path_prefix="figures"),
+        )
+
     latest_md_path = output_dir / "summary_ratio_by_language_model.md"
     if latest_md_path.exists():
         _upsert_figures_section(
             latest_md_path,
+            _build_figures_section(
+                outputs,
+                path_prefix=f"summaries/{safe_suite_name}/figures",
+            ),
+        )
+
+    latest_token_count_md_path = output_dir / "summary_token_count_by_language_model.md"
+    if latest_token_count_md_path.exists():
+        _upsert_figures_section(
+            latest_token_count_md_path,
             _build_figures_section(
                 outputs,
                 path_prefix=f"summaries/{safe_suite_name}/figures",

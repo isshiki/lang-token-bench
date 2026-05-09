@@ -911,9 +911,15 @@ def _handle_summarize_command(args: argparse.Namespace) -> int:
     print(f"Suite CSV: {report_paths.suite_csv}")
     print(f"Suite Markdown: {report_paths.suite_markdown}")
     print(f"Suite heatmap CSV: {report_paths.suite_heatmap_csv}")
+    print(f"Suite token count CSV: {report_paths.suite_token_count_csv}")
+    print(f"Suite token count Markdown: {report_paths.suite_token_count_markdown}")
+    print(f"Suite token count heatmap CSV: {report_paths.suite_token_count_heatmap_csv}")
     print(f"Latest CSV: {report_paths.latest_csv}")
     print(f"Latest Markdown: {report_paths.latest_markdown}")
     print(f"Latest heatmap CSV: {report_paths.latest_heatmap_csv}")
+    print(f"Latest token count CSV: {report_paths.latest_token_count_csv}")
+    print(f"Latest token count Markdown: {report_paths.latest_token_count_markdown}")
+    print(f"Latest token count heatmap CSV: {report_paths.latest_token_count_heatmap_csv}")
     return 0
 
 
