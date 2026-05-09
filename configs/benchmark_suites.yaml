@@ -1,5 +1,5 @@
 suites:
-  - name: main_2026_04
+  - name: main_2026_05
     description: Main April 2026 comparison candidates.
     model_ids:
       - openai/gpt-5.5
@@ -10,14 +10,14 @@ suites:
       - qwen/qwen3.6-27b
       - moonshotai/kimi-k2.6
 
-  - name: budget_2026_04
+  - name: budget_2026_05
     description: Budget-oriented models for low-cost benchmark runs.
     model_ids:
       - google/gemini-3-flash-preview
       - openai/gpt-4o-mini
       - openai/gpt-oss-120b
 
-  - name: all_2026_04
+  - name: all_2026_05
     description: All April 2026 comparison models without duplicates.
     model_ids:
       - openai/gpt-5.5
@@ -53,7 +53,7 @@ suites:
         show_value_labels: true
         legend_position: top
 
-  - name: public_comparison_2026_04
+  - name: public_comparison_2026_05
     description: Models selected for the public comparison table.
     model_ids:
       - openai/gpt-5.5
