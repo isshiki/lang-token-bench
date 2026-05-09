@@ -350,8 +350,14 @@ Start with the suite-scoped summary and figures:
 
 - `outputs/summaries/<suite_name>/summary_ratio_by_language_model.md`
 - `outputs/summaries/<suite_name>/summary_token_count_by_language_model.md`
+- `outputs/summaries/<suite_name>/summary_relative_token_count_by_language_model.md`
+- `outputs/summaries/<suite_name>/summary_weighted_ratio_by_language_model.md`
+- `outputs/summaries/<suite_name>/summary_excess_tokens_by_language_model.md`
 - `outputs/summaries/<suite_name>/figures/heatmap_ratio_by_language_model.svg`
 - `outputs/summaries/<suite_name>/figures/heatmap_token_count_by_language_model.svg`
+- `outputs/summaries/<suite_name>/figures/heatmap_relative_token_count_by_language_model.svg`
+- `outputs/summaries/<suite_name>/figures/heatmap_weighted_ratio_by_language_model.svg`
+- `outputs/summaries/<suite_name>/figures/heatmap_excess_tokens_by_language_model.svg`
 - `outputs/summaries/<suite_name>/figures/*.svg`
 
 For run provenance and detailed rows, check:
@@ -424,6 +430,15 @@ outputs/heatmap_ratio_language_model.csv
 outputs/summary_token_count_by_language_model.csv
 outputs/summary_token_count_by_language_model.md
 outputs/heatmap_token_count_language_model.csv
+outputs/summary_relative_token_count_by_language_model.csv
+outputs/summary_relative_token_count_by_language_model.md
+outputs/heatmap_relative_token_count_language_model.csv
+outputs/summary_weighted_ratio_by_language_model.csv
+outputs/summary_weighted_ratio_by_language_model.md
+outputs/heatmap_weighted_ratio_language_model.csv
+outputs/summary_excess_tokens_by_language_model.csv
+outputs/summary_excess_tokens_by_language_model.md
+outputs/heatmap_excess_tokens_language_model.csv
 ```
 
 Each `summarize --suite <suite_name>` run also writes suite-scoped files under
@@ -436,6 +451,15 @@ outputs/summaries/<suite_name>/heatmap_ratio_language_model.csv
 outputs/summaries/<suite_name>/summary_token_count_by_language_model.csv
 outputs/summaries/<suite_name>/summary_token_count_by_language_model.md
 outputs/summaries/<suite_name>/heatmap_token_count_language_model.csv
+outputs/summaries/<suite_name>/summary_relative_token_count_by_language_model.csv
+outputs/summaries/<suite_name>/summary_relative_token_count_by_language_model.md
+outputs/summaries/<suite_name>/heatmap_relative_token_count_language_model.csv
+outputs/summaries/<suite_name>/summary_weighted_ratio_by_language_model.csv
+outputs/summaries/<suite_name>/summary_weighted_ratio_by_language_model.md
+outputs/summaries/<suite_name>/heatmap_weighted_ratio_language_model.csv
+outputs/summaries/<suite_name>/summary_excess_tokens_by_language_model.csv
+outputs/summaries/<suite_name>/summary_excess_tokens_by_language_model.md
+outputs/summaries/<suite_name>/heatmap_excess_tokens_language_model.csv
 ```
 
 Summary rows are languages, columns are model IDs, and values are average
@@ -451,6 +475,23 @@ absolute token counts are useful for understanding prompt size and cost
 exposure; they are affected by the underlying sample lengths and should be read
 alongside `ratio_to_english`.
 
+The relative token count summary files use the same absolute token counts, then
+normalize every cell by the lowest token-count cell in the table. `1.00x` means
+the lowest observed language/model cell for that suite; larger values show
+relative input token volume within the same figure. This is often easier to
+explain publicly than model-specific English-normalized ratios.
+
+The weighted ratio summary files combine both signals by using total token
+volume. They are calculated as total tokens for a language divided by total
+English tokens for the same model and saved text records. This prevents very
+short samples from contributing the same weight as long article-like samples.
+
+The excess token summary files show total input prompt tokens minus the
+matching English total. Positive values mean the language used more prompt
+tokens than English across the saved sample set; negative values mean it used
+fewer. Average rows exclude English so the zero baseline does not dilute
+non-English differences.
+
 `heatmap_ratio_language_model.csv` is written in long format for charting:
 
 ```text
@@ -461,17 +502,26 @@ It includes the same average cells and marks them with `is_average=true`, so a
 plotting script can include or filter average annotations explicitly.
 `heatmap_token_count_language_model.csv` follows the same long format with a
 `token_count` value column.
+`heatmap_relative_token_count_language_model.csv` follows the same long format
+with a `relative_token_count` value column.
+`heatmap_weighted_ratio_language_model.csv` and
+`heatmap_excess_tokens_language_model.csv` use the same long format with
+`weighted_ratio_to_english` and `excess_tokens_vs_english` value columns.
 
 The `plot` command reads the suite-scoped
 `summary_ratio_by_language_model.csv` and
-`summary_token_count_by_language_model.csv`, then writes figures under:
+`summary_token_count_by_language_model.csv`, plus relative-token-count,
+weighted-ratio, and excess-token summaries, then writes figures under:
 
 ```text
 outputs/summaries/<suite_name>/figures/
 ```
 
-It always generates `heatmap_ratio_by_language_model.png` / `.svg` and
-`heatmap_token_count_by_language_model.png` / `.svg`. Chart
+It always generates `heatmap_ratio_by_language_model.png` / `.svg`,
+`heatmap_token_count_by_language_model.png` / `.svg`,
+`heatmap_relative_token_count_by_language_model.png` / `.svg`,
+`heatmap_weighted_ratio_by_language_model.png` / `.svg`, and
+`heatmap_excess_tokens_by_language_model.png` / `.svg`. Chart
 definitions in `configs/benchmark_suites.yaml` can add extra figures. The
 `public_comparison_2026_04` suite includes an OpenAI vs Anthropic two-model bar
 chart based on OpenRouter observed usage, written as

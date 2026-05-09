@@ -102,9 +102,18 @@ uv run pytest -p no:debugging
   average rows exclude English. Heatmap CSV is long format with `is_average`.
 - Summary generation also writes token count CSV/Markdown and token count
   heatmap CSV files using average observed input prompt token counts.
+- Summary generation also writes relative token count CSV/Markdown files.
+  Relative token count normalizes every token-count cell by the minimum
+  token-count cell in that summary table, so `1.00x` is the lowest observed
+  language/model cell.
+- Summary generation also writes weighted ratio and excess token CSV/Markdown
+  files. Weighted ratio is total language prompt tokens divided by total
+  English prompt tokens; excess tokens are total language prompt tokens minus
+  the matching English total. Average rows should exclude English.
 - Plot generation reads suite-scoped summary CSV files and writes figures under
   `outputs/summaries/<suite_name>/figures/`; it requires `uv sync --extra viz`.
-- Plot generation should include both ratio and input-token-count heatmaps.
+- Plot generation should include ratio, input-token-count,
+  relative-token-count, weighted-ratio, and excess-token heatmaps.
 - Suite chart definitions live in `configs/benchmark_suites.yaml`.
 - Plot labels should come from `configs/models.yaml` `short_name` and
   `configs/languages.yaml` `plot_label` with sensible fallbacks.

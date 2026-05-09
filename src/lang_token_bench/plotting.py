@@ -53,6 +53,11 @@ def plot_suite_figures(
     summary_dir = output_dir / "summaries" / safe_summary_suite_name(suite.name)
     summary_csv_path = summary_dir / "summary_ratio_by_language_model.csv"
     token_count_summary_csv_path = summary_dir / "summary_token_count_by_language_model.csv"
+    relative_token_count_summary_csv_path = (
+        summary_dir / "summary_relative_token_count_by_language_model.csv"
+    )
+    weighted_ratio_summary_csv_path = summary_dir / "summary_weighted_ratio_by_language_model.csv"
+    excess_tokens_summary_csv_path = summary_dir / "summary_excess_tokens_by_language_model.csv"
     if not summary_csv_path.exists():
         raise ValueError(
             f"Summary CSV not found: {summary_csv_path}. "
@@ -63,9 +68,27 @@ def plot_suite_figures(
             f"Token count summary CSV not found: {token_count_summary_csv_path}. "
             f"Run: uv run lang-token-bench summarize --suite {suite.name}"
         )
+    if not relative_token_count_summary_csv_path.exists():
+        raise ValueError(
+            f"Relative token count summary CSV not found: {relative_token_count_summary_csv_path}. "
+            f"Run: uv run lang-token-bench summarize --suite {suite.name}"
+        )
+    if not weighted_ratio_summary_csv_path.exists():
+        raise ValueError(
+            f"Weighted ratio summary CSV not found: {weighted_ratio_summary_csv_path}. "
+            f"Run: uv run lang-token-bench summarize --suite {suite.name}"
+        )
+    if not excess_tokens_summary_csv_path.exists():
+        raise ValueError(
+            f"Excess token summary CSV not found: {excess_tokens_summary_csv_path}. "
+            f"Run: uv run lang-token-bench summarize --suite {suite.name}"
+        )
 
     summary_csv = load_summary_csv(summary_csv_path)
     token_count_summary_csv = load_summary_csv(token_count_summary_csv_path)
+    relative_token_count_summary_csv = load_summary_csv(relative_token_count_summary_csv_path)
+    weighted_ratio_summary_csv = load_summary_csv(weighted_ratio_summary_csv_path)
+    excess_tokens_summary_csv = load_summary_csv(excess_tokens_summary_csv_path)
     labels = build_plot_labels(models_path=models_path, languages_path=languages_path)
     figures_dir = summary_dir / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)
@@ -80,7 +103,22 @@ def plot_suite_figures(
             summary_csv=token_count_summary_csv,
             labels=labels,
             figures_dir=figures_dir,
-        )
+        ),
+        _plot_relative_token_count_heatmap(
+            summary_csv=relative_token_count_summary_csv,
+            labels=labels,
+            figures_dir=figures_dir,
+        ),
+        _plot_weighted_ratio_heatmap(
+            summary_csv=weighted_ratio_summary_csv,
+            labels=labels,
+            figures_dir=figures_dir,
+        ),
+        _plot_excess_tokens_heatmap(
+            summary_csv=excess_tokens_summary_csv,
+            labels=labels,
+            figures_dir=figures_dir,
+        ),
     ]
     for chart in suite.charts:
         if chart.type == "two_model_bar":
@@ -226,6 +264,147 @@ def _plot_token_count_heatmap(
     )
 
 
+def _plot_relative_token_count_heatmap(
+    *,
+    summary_csv: SummaryCsv,
+    labels: PlotLabels,
+    figures_dir: Path,
+) -> PlotOutput:
+    plt = _load_pyplot()
+    model_ids = [*summary_csv.model_ids, "Avg"]
+    model_labels = [_format_model_label(model_id, labels) for model_id in model_ids]
+    language_labels = [
+        _format_language_label(row, labels)
+        for row in summary_csv.rows
+    ]
+    values = [
+        [_parse_ratio(row.get(model_id, "")) for model_id in model_ids]
+        for row in summary_csv.rows
+    ]
+
+    fig_width = max(9.0, 1.25 * len(model_ids) + 2.5)
+    fig_height = max(5.5, 0.55 * len(language_labels) + 2.5)
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    cmap, norm = build_relative_token_count_colormap_and_norm(values)
+    image = ax.imshow(values, cmap=cmap, norm=norm, aspect="auto")
+    fig.colorbar(image, ax=ax, label="Relative input prompt tokens")
+
+    ax.set_xticks(range(len(model_ids)))
+    ax.set_xticklabels(model_labels, rotation=35, ha="left")
+    ax.tick_params(top=True, bottom=False, labeltop=True, labelbottom=False)
+    ax.set_yticks(range(len(language_labels)))
+    ax.set_yticklabels(language_labels)
+
+    for row_index, row_values in enumerate(values):
+        for col_index, value in enumerate(row_values):
+            label = "" if math.isnan(value) else f"{value:.2f}x"
+            ax.text(col_index, row_index, label, ha="center", va="center", fontsize=8)
+
+    return _save_figure(
+        fig=fig,
+        figures_dir=figures_dir,
+        output_name="heatmap_relative_token_count_by_language_model",
+        label="relative token count heatmap",
+        markdown_heading="Language x Model Relative Input Token Count",
+        alt_text="Language x Model Relative Input Token Count",
+        plt=plt,
+    )
+
+
+def _plot_weighted_ratio_heatmap(
+    *,
+    summary_csv: SummaryCsv,
+    labels: PlotLabels,
+    figures_dir: Path,
+) -> PlotOutput:
+    plt = _load_pyplot()
+    model_ids = [*summary_csv.model_ids, "Avg"]
+    model_labels = [_format_model_label(model_id, labels) for model_id in model_ids]
+    language_labels = [
+        _format_language_label(row, labels)
+        for row in summary_csv.rows
+    ]
+    values = [
+        [_parse_ratio(row.get(model_id, "")) for model_id in model_ids]
+        for row in summary_csv.rows
+    ]
+
+    fig_width = max(9.0, 1.25 * len(model_ids) + 2.5)
+    fig_height = max(5.5, 0.55 * len(language_labels) + 2.5)
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    cmap, norm = build_ratio_colormap_and_norm(values)
+    image = ax.imshow(values, cmap=cmap, norm=norm, aspect="auto")
+    fig.colorbar(image, ax=ax, label="Weighted ratio to English")
+
+    ax.set_xticks(range(len(model_ids)))
+    ax.set_xticklabels(model_labels, rotation=35, ha="left")
+    ax.tick_params(top=True, bottom=False, labeltop=True, labelbottom=False)
+    ax.set_yticks(range(len(language_labels)))
+    ax.set_yticklabels(language_labels)
+
+    for row_index, row_values in enumerate(values):
+        for col_index, value in enumerate(row_values):
+            label = "" if math.isnan(value) else f"{value:.2f}x"
+            ax.text(col_index, row_index, label, ha="center", va="center", fontsize=8)
+
+    return _save_figure(
+        fig=fig,
+        figures_dir=figures_dir,
+        output_name="heatmap_weighted_ratio_by_language_model",
+        label="weighted ratio heatmap",
+        markdown_heading="Language x Model Weighted Token Ratio",
+        alt_text="Language x Model Weighted Token Ratio",
+        plt=plt,
+    )
+
+
+def _plot_excess_tokens_heatmap(
+    *,
+    summary_csv: SummaryCsv,
+    labels: PlotLabels,
+    figures_dir: Path,
+) -> PlotOutput:
+    plt = _load_pyplot()
+    model_ids = [*summary_csv.model_ids, "Avg"]
+    model_labels = [_format_model_label(model_id, labels) for model_id in model_ids]
+    language_labels = [
+        _format_language_label(row, labels)
+        for row in summary_csv.rows
+    ]
+    values = [
+        [_parse_ratio(row.get(model_id, "")) for model_id in model_ids]
+        for row in summary_csv.rows
+    ]
+
+    fig_width = max(9.0, 1.25 * len(model_ids) + 2.5)
+    fig_height = max(5.5, 0.55 * len(language_labels) + 2.5)
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    cmap, norm = build_excess_tokens_colormap_and_norm(values)
+    image = ax.imshow(values, cmap=cmap, norm=norm, aspect="auto")
+    fig.colorbar(image, ax=ax, label="Excess input prompt tokens vs English")
+
+    ax.set_xticks(range(len(model_ids)))
+    ax.set_xticklabels(model_labels, rotation=35, ha="left")
+    ax.tick_params(top=True, bottom=False, labeltop=True, labelbottom=False)
+    ax.set_yticks(range(len(language_labels)))
+    ax.set_yticklabels(language_labels)
+
+    for row_index, row_values in enumerate(values):
+        for col_index, value in enumerate(row_values):
+            label = "" if math.isnan(value) else _format_excess_token_label(value)
+            ax.text(col_index, row_index, label, ha="center", va="center", fontsize=8)
+
+    return _save_figure(
+        fig=fig,
+        figures_dir=figures_dir,
+        output_name="heatmap_excess_tokens_by_language_model",
+        label="excess token heatmap",
+        markdown_heading="Language x Model Excess Input Tokens",
+        alt_text="Language x Model Excess Input Tokens",
+        plt=plt,
+    )
+
+
 def build_token_count_colormap():
     try:
         from matplotlib.colors import LinearSegmentedColormap
@@ -244,6 +423,34 @@ def build_token_count_colormap():
             "#5A9FCD",
         ],
     )
+
+
+def build_relative_token_count_colormap_and_norm(values: list[list[float]]):
+    try:
+        from matplotlib.colors import LinearSegmentedColormap, Normalize
+    except ImportError as exc:
+        raise CounterUnavailableError(PLOT_INSTALL_MESSAGE) from exc
+
+    numeric_values = [
+        value
+        for row in values
+        for value in row
+        if not math.isnan(value)
+    ]
+    data_max = max(numeric_values) if numeric_values else 1.0
+    cmap = LinearSegmentedColormap.from_list(
+        "relative_token_count_mint_orange",
+        [
+            "#F7FCF0",
+            "#D9F0D3",
+            "#A8DDB5",
+            "#7BCCC4",
+            "#FDE0A2",
+            "#F28E2B",
+        ],
+    )
+    norm = Normalize(vmin=1.0, vmax=max(2.0, data_max))
+    return cmap, norm
 
 
 def _plot_two_model_bar(
@@ -349,6 +556,35 @@ def build_ratio_colormap_and_norm(values: list[list[float]]):
         ],
     )
     norm = TwoSlopeNorm(vmin=vmin, vcenter=1.0, vmax=vmax)
+    return cmap, norm
+
+
+def build_excess_tokens_colormap_and_norm(values: list[list[float]]):
+    try:
+        from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
+    except ImportError as exc:
+        raise CounterUnavailableError(PLOT_INSTALL_MESSAGE) from exc
+
+    numeric_values = [
+        value
+        for row in values
+        for value in row
+        if not math.isnan(value)
+    ]
+    data_min = min(numeric_values) if numeric_values else 0.0
+    data_max = max(numeric_values) if numeric_values else 0.0
+    magnitude = max(abs(data_min), abs(data_max), 1.0)
+    vmin = min(data_min, -0.1 * magnitude)
+    vmax = max(data_max, 0.1 * magnitude)
+    cmap = LinearSegmentedColormap.from_list(
+        "excess_tokens_green_white_orange",
+        [
+            (0.0, "#2E7D32"),
+            (0.5, "#F7F7F7"),
+            (1.0, "#F28E2B"),
+        ],
+    )
+    norm = TwoSlopeNorm(vmin=vmin, vcenter=0.0, vmax=vmax)
     return cmap, norm
 
 
@@ -484,6 +720,12 @@ def _add_bar_value_labels(ax, bars, values: list[float]) -> None:
         )
 
 
+def _format_excess_token_label(value: float) -> str:
+    if value > 0:
+        return f"+{value:,.0f}"
+    return f"{value:,.0f}"
+
+
 def _format_chart_heading(chart: ChartConfig) -> str:
     if chart.id == "openai_vs_anthropic_bar":
         return "OpenAI vs Anthropic"
@@ -497,49 +739,27 @@ def _update_summary_markdown_files(
     suite_name: str,
 ) -> None:
     safe_suite_name = safe_summary_suite_name(suite_name)
-    suite_md_path = (
-        output_dir
-        / "summaries"
-        / safe_suite_name
-        / "summary_ratio_by_language_model.md"
+    summary_markdown_names = [
+        "summary_ratio_by_language_model.md",
+        "summary_token_count_by_language_model.md",
+        "summary_relative_token_count_by_language_model.md",
+        "summary_weighted_ratio_by_language_model.md",
+        "summary_excess_tokens_by_language_model.md",
+    ]
+    suite_figures_section = _build_figures_section(outputs, path_prefix="figures")
+    latest_figures_section = _build_figures_section(
+        outputs,
+        path_prefix=f"summaries/{safe_suite_name}/figures",
     )
-    if suite_md_path.exists():
-        _upsert_figures_section(
-            suite_md_path,
-            _build_figures_section(outputs, path_prefix="figures"),
-        )
 
-    suite_token_count_md_path = (
-        output_dir
-        / "summaries"
-        / safe_suite_name
-        / "summary_token_count_by_language_model.md"
-    )
-    if suite_token_count_md_path.exists():
-        _upsert_figures_section(
-            suite_token_count_md_path,
-            _build_figures_section(outputs, path_prefix="figures"),
-        )
+    for markdown_name in summary_markdown_names:
+        suite_md_path = output_dir / "summaries" / safe_suite_name / markdown_name
+        if suite_md_path.exists():
+            _upsert_figures_section(suite_md_path, suite_figures_section)
 
-    latest_md_path = output_dir / "summary_ratio_by_language_model.md"
-    if latest_md_path.exists():
-        _upsert_figures_section(
-            latest_md_path,
-            _build_figures_section(
-                outputs,
-                path_prefix=f"summaries/{safe_suite_name}/figures",
-            ),
-        )
-
-    latest_token_count_md_path = output_dir / "summary_token_count_by_language_model.md"
-    if latest_token_count_md_path.exists():
-        _upsert_figures_section(
-            latest_token_count_md_path,
-            _build_figures_section(
-                outputs,
-                path_prefix=f"summaries/{safe_suite_name}/figures",
-            ),
-        )
+        latest_md_path = output_dir / markdown_name
+        if latest_md_path.exists():
+            _upsert_figures_section(latest_md_path, latest_figures_section)
 
 
 def _build_figures_section(outputs: list[PlotOutput], *, path_prefix: str) -> str:

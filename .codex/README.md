@@ -122,6 +122,13 @@ heatmap CSV is long format and uses `is_average` to mark average cells.
 Plot outputs are written under `outputs/summaries/<suite_name>/figures/`.
 Summaries also include token count CSV/Markdown outputs and a token count
 heatmap for average observed input prompt tokens.
+Summaries also include relative token count CSV/Markdown outputs. Relative
+token count normalizes every token-count cell by the minimum token-count cell
+in the table, so `1.00x` means the lowest observed language/model cell.
+Summaries also include weighted ratio and excess token CSV/Markdown outputs.
+Weighted ratio uses total language prompt tokens divided by total English
+prompt tokens, while excess tokens use total language prompt tokens minus the
+matching English total. Average rows should exclude English.
 Plots should use model `short_name` and language `plot_label` from the config
 files when present.
 Heatmaps use a diverging ratio scale centered on `1.0`. Two-model bar charts

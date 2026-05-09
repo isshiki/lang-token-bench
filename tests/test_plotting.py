@@ -5,8 +5,10 @@ import pytest
 import lang_token_bench.plotting as plotting
 from lang_token_bench.cli import main
 from lang_token_bench.plotting import (
+    build_excess_tokens_colormap_and_norm,
     build_plot_labels,
     build_ratio_colormap_and_norm,
+    build_relative_token_count_colormap_and_norm,
     build_token_count_colormap,
     sort_bar_rows,
 )
@@ -42,6 +44,57 @@ def _write_token_count_summary_csv(path) -> None:
                 "ja,Japanese,140,160,150",
                 "fr,French,120,130,125",
                 "avg,Avg,120,133.33,126.67",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_relative_token_count_summary_csv(path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "\n".join(
+            [
+                "language_code,language_name,model/a,model/b,Avg",
+                "en,English,1,1.1,1.05",
+                "ja,Japanese,1.4,1.6,1.5",
+                "fr,French,1.2,1.3,1.25",
+                "avg,Avg,1.2,1.3333,1.2667",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_weighted_ratio_summary_csv(path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "\n".join(
+            [
+                "language_code,language_name,model/a,model/b,Avg",
+                "en,English,1,1,1",
+                "ja,Japanese,1.5,1.7,1.6",
+                "fr,French,1.15,1.25,1.2",
+                "avg,Avg,1.325,1.475,1.4",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_excess_tokens_summary_csv(path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "\n".join(
+            [
+                "language_code,language_name,model/a,model/b,Avg",
+                "en,English,0,0,0",
+                "ja,Japanese,40,50,45",
+                "fr,French,12,15,13.5",
+                "avg,Avg,26,32.5,29.25",
             ]
         )
         + "\n",
@@ -143,10 +196,19 @@ def test_plot_command_writes_heatmap_and_configured_bar(tmp_path, monkeypatch) -
     summary_dir = tmp_path / "summaries" / "test_suite"
     _write_summary_csv(summary_dir / "summary_ratio_by_language_model.csv")
     _write_token_count_summary_csv(summary_dir / "summary_token_count_by_language_model.csv")
+    _write_relative_token_count_summary_csv(summary_dir / "summary_relative_token_count_by_language_model.csv")
+    _write_weighted_ratio_summary_csv(summary_dir / "summary_weighted_ratio_by_language_model.csv")
+    _write_excess_tokens_summary_csv(summary_dir / "summary_excess_tokens_by_language_model.csv")
     _write_summary_markdown(summary_dir / "summary_ratio_by_language_model.md")
     _write_summary_markdown(summary_dir / "summary_token_count_by_language_model.md")
+    _write_summary_markdown(summary_dir / "summary_relative_token_count_by_language_model.md")
+    _write_summary_markdown(summary_dir / "summary_weighted_ratio_by_language_model.md")
+    _write_summary_markdown(summary_dir / "summary_excess_tokens_by_language_model.md")
     _write_summary_markdown(tmp_path / "summary_ratio_by_language_model.md")
     _write_summary_markdown(tmp_path / "summary_token_count_by_language_model.md")
+    _write_summary_markdown(tmp_path / "summary_relative_token_count_by_language_model.md")
+    _write_summary_markdown(tmp_path / "summary_weighted_ratio_by_language_model.md")
+    _write_summary_markdown(tmp_path / "summary_excess_tokens_by_language_model.md")
     colormap_calls = []
     original_build_colormap = plotting.build_ratio_colormap_and_norm
 
@@ -184,6 +246,12 @@ def test_plot_command_writes_heatmap_and_configured_bar(tmp_path, monkeypatch) -
     assert (figures_dir / "heatmap_ratio_by_language_model.svg").exists()
     assert (figures_dir / "heatmap_token_count_by_language_model.png").exists()
     assert (figures_dir / "heatmap_token_count_by_language_model.svg").exists()
+    assert (figures_dir / "heatmap_relative_token_count_by_language_model.png").exists()
+    assert (figures_dir / "heatmap_relative_token_count_by_language_model.svg").exists()
+    assert (figures_dir / "heatmap_weighted_ratio_by_language_model.png").exists()
+    assert (figures_dir / "heatmap_weighted_ratio_by_language_model.svg").exists()
+    assert (figures_dir / "heatmap_excess_tokens_by_language_model.png").exists()
+    assert (figures_dir / "heatmap_excess_tokens_by_language_model.svg").exists()
     assert (figures_dir / "model_a_vs_b.png").exists()
     assert (figures_dir / "model_a_vs_b.svg").exists()
 
@@ -203,19 +271,49 @@ def test_plot_command_writes_heatmap_and_configured_bar(tmp_path, monkeypatch) -
     suite_token_count_markdown = (
         summary_dir / "summary_token_count_by_language_model.md"
     ).read_text(encoding="utf-8")
+    suite_relative_token_count_markdown = (
+        summary_dir / "summary_relative_token_count_by_language_model.md"
+    ).read_text(encoding="utf-8")
+    suite_weighted_ratio_markdown = (
+        summary_dir / "summary_weighted_ratio_by_language_model.md"
+    ).read_text(encoding="utf-8")
+    suite_excess_tokens_markdown = (
+        summary_dir / "summary_excess_tokens_by_language_model.md"
+    ).read_text(encoding="utf-8")
     latest_markdown = (tmp_path / "summary_ratio_by_language_model.md").read_text(
         encoding="utf-8"
     )
     latest_token_count_markdown = (
         tmp_path / "summary_token_count_by_language_model.md"
     ).read_text(encoding="utf-8")
+    latest_relative_token_count_markdown = (
+        tmp_path / "summary_relative_token_count_by_language_model.md"
+    ).read_text(encoding="utf-8")
+    latest_weighted_ratio_markdown = (
+        tmp_path / "summary_weighted_ratio_by_language_model.md"
+    ).read_text(encoding="utf-8")
+    latest_excess_tokens_markdown = (
+        tmp_path / "summary_excess_tokens_by_language_model.md"
+    ).read_text(encoding="utf-8")
     assert suite_markdown.count("## Figures") == 1
     assert suite_token_count_markdown.count("## Figures") == 1
+    assert suite_relative_token_count_markdown.count("## Figures") == 1
+    assert suite_weighted_ratio_markdown.count("## Figures") == 1
+    assert suite_excess_tokens_markdown.count("## Figures") == 1
     assert latest_markdown.count("## Figures") == 1
     assert latest_token_count_markdown.count("## Figures") == 1
+    assert latest_relative_token_count_markdown.count("## Figures") == 1
+    assert latest_weighted_ratio_markdown.count("## Figures") == 1
+    assert latest_excess_tokens_markdown.count("## Figures") == 1
     assert "![Language x Model Token Ratio](figures/heatmap_ratio_by_language_model.svg)" in suite_markdown
     assert "![Language x Model Input Token Count](figures/heatmap_token_count_by_language_model.svg)" in suite_markdown
+    assert "![Language x Model Relative Input Token Count](figures/heatmap_relative_token_count_by_language_model.svg)" in suite_markdown
+    assert "![Language x Model Weighted Token Ratio](figures/heatmap_weighted_ratio_by_language_model.svg)" in suite_markdown
+    assert "![Language x Model Excess Input Tokens](figures/heatmap_excess_tokens_by_language_model.svg)" in suite_markdown
     assert "![Language x Model Input Token Count](figures/heatmap_token_count_by_language_model.svg)" in suite_token_count_markdown
+    assert "![Language x Model Relative Input Token Count](figures/heatmap_relative_token_count_by_language_model.svg)" in suite_relative_token_count_markdown
+    assert "![Language x Model Weighted Token Ratio](figures/heatmap_weighted_ratio_by_language_model.svg)" in suite_weighted_ratio_markdown
+    assert "![Language x Model Excess Input Tokens](figures/heatmap_excess_tokens_by_language_model.svg)" in suite_excess_tokens_markdown
     assert "![Model A vs Model B](figures/model_a_vs_b.svg)" in suite_markdown
     assert (
         "![Language x Model Token Ratio](summaries/test_suite/figures/heatmap_ratio_by_language_model.svg)"
@@ -224,6 +322,18 @@ def test_plot_command_writes_heatmap_and_configured_bar(tmp_path, monkeypatch) -
     assert (
         "![Language x Model Input Token Count](summaries/test_suite/figures/heatmap_token_count_by_language_model.svg)"
         in latest_token_count_markdown
+    )
+    assert (
+        "![Language x Model Relative Input Token Count](summaries/test_suite/figures/heatmap_relative_token_count_by_language_model.svg)"
+        in latest_relative_token_count_markdown
+    )
+    assert (
+        "![Language x Model Weighted Token Ratio](summaries/test_suite/figures/heatmap_weighted_ratio_by_language_model.svg)"
+        in latest_weighted_ratio_markdown
+    )
+    assert (
+        "![Language x Model Excess Input Tokens](summaries/test_suite/figures/heatmap_excess_tokens_by_language_model.svg)"
+        in latest_excess_tokens_markdown
     )
 
 
@@ -246,6 +356,9 @@ def test_plot_command_uses_safe_suite_folder(tmp_path) -> None:
     summary_dir = tmp_path / "summaries" / "unsafe-suite-..-name"
     _write_summary_csv(summary_dir / "summary_ratio_by_language_model.csv")
     _write_token_count_summary_csv(summary_dir / "summary_token_count_by_language_model.csv")
+    _write_relative_token_count_summary_csv(summary_dir / "summary_relative_token_count_by_language_model.csv")
+    _write_weighted_ratio_summary_csv(summary_dir / "summary_weighted_ratio_by_language_model.csv")
+    _write_excess_tokens_summary_csv(summary_dir / "summary_excess_tokens_by_language_model.csv")
 
     exit_code = main(
         [
@@ -270,6 +383,21 @@ def test_plot_command_uses_safe_suite_folder(tmp_path) -> None:
         summary_dir
         / "figures"
         / "heatmap_token_count_by_language_model.png"
+    ).exists()
+    assert (
+        summary_dir
+        / "figures"
+        / "heatmap_relative_token_count_by_language_model.png"
+    ).exists()
+    assert (
+        summary_dir
+        / "figures"
+        / "heatmap_weighted_ratio_by_language_model.png"
+    ).exists()
+    assert (
+        summary_dir
+        / "figures"
+        / "heatmap_excess_tokens_by_language_model.png"
     ).exists()
     assert not (tmp_path / "summaries" / "unsafe").exists()
 
@@ -310,6 +438,29 @@ def test_token_count_colormap_uses_soft_blue_green_scale() -> None:
     cmap = build_token_count_colormap()
 
     assert cmap.name == "token_count_soft_blue_green"
+
+
+def test_relative_token_count_colormap_uses_minimum_ratio_baseline() -> None:
+    from matplotlib.colors import Normalize
+
+    cmap, norm = build_relative_token_count_colormap_and_norm([[1.0, 1.3, 2.5]])
+
+    assert cmap.name == "relative_token_count_mint_orange"
+    assert isinstance(norm, Normalize)
+    assert norm.vmin == pytest.approx(1.0)
+    assert norm.vmax == pytest.approx(2.5)
+
+
+def test_excess_tokens_colormap_uses_zero_centered_two_slope_norm() -> None:
+    from matplotlib.colors import TwoSlopeNorm
+
+    cmap, norm = build_excess_tokens_colormap_and_norm([[-10.0, 0.0, 40.0]])
+
+    assert cmap.name == "excess_tokens_green_white_orange"
+    assert isinstance(norm, TwoSlopeNorm)
+    assert norm.vmin == pytest.approx(-10.0)
+    assert norm.vcenter == pytest.approx(0.0)
+    assert norm.vmax == pytest.approx(40.0)
 
 
 def test_bar_rows_sort_by_lower_average_model_with_language_order_tie_break() -> None:

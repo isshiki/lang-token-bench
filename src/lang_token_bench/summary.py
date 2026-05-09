@@ -15,6 +15,8 @@ class SummaryRow:
     language_name: str
     ratios_by_model: dict[str, float | None]
     token_counts_by_model: dict[str, float | None]
+    weighted_ratios_by_model: dict[str, float | None]
+    excess_tokens_by_model: dict[str, float | None]
 
 
 @dataclass(frozen=True)
@@ -32,12 +34,30 @@ class SummaryReportPaths:
     latest_token_count_csv: Path
     latest_token_count_markdown: Path
     latest_token_count_heatmap_csv: Path
+    latest_relative_token_count_csv: Path
+    latest_relative_token_count_markdown: Path
+    latest_relative_token_count_heatmap_csv: Path
+    latest_weighted_ratio_csv: Path
+    latest_weighted_ratio_markdown: Path
+    latest_weighted_ratio_heatmap_csv: Path
+    latest_excess_tokens_csv: Path
+    latest_excess_tokens_markdown: Path
+    latest_excess_tokens_heatmap_csv: Path
     suite_csv: Path
     suite_markdown: Path
     suite_heatmap_csv: Path
     suite_token_count_csv: Path
     suite_token_count_markdown: Path
     suite_token_count_heatmap_csv: Path
+    suite_relative_token_count_csv: Path
+    suite_relative_token_count_markdown: Path
+    suite_relative_token_count_heatmap_csv: Path
+    suite_weighted_ratio_csv: Path
+    suite_weighted_ratio_markdown: Path
+    suite_weighted_ratio_heatmap_csv: Path
+    suite_excess_tokens_csv: Path
+    suite_excess_tokens_markdown: Path
+    suite_excess_tokens_heatmap_csv: Path
 
 
 @dataclass(frozen=True)
@@ -109,6 +129,7 @@ def summarize_suite_results(
     languages = [language for language in load_languages(languages_path) if language.enabled]
     ratio_grouped: dict[tuple[str, str], list[float]] = {}
     token_count_grouped: dict[tuple[str, str], list[int]] = {}
+    token_count_by_model_text_language: dict[tuple[str, str, str], int] = {}
     for result in selected:
         ratio_grouped.setdefault((result.language_code, result.model_id), []).append(
             float(result.ratio_to_english)
@@ -116,11 +137,16 @@ def summarize_suite_results(
         token_count_grouped.setdefault((result.language_code, result.model_id), []).append(
             result.token_count
         )
+        token_count_by_model_text_language[
+            (result.model_id, result.text_id, result.language_code)
+        ] = result.token_count
 
     rows: list[SummaryRow] = []
     for language in languages:
         ratios_by_model: dict[str, float | None] = {}
         token_counts_by_model: dict[str, float | None] = {}
+        weighted_ratios_by_model: dict[str, float | None] = {}
+        excess_tokens_by_model: dict[str, float | None] = {}
         for model_id in suite.model_ids:
             values = ratio_grouped.get((language.code, model_id), [])
             if not values:
@@ -131,12 +157,21 @@ def summarize_suite_results(
                 ratios_by_model[model_id] = round(sum(values) / len(values), 6)
             token_counts = token_count_grouped.get((language.code, model_id), [])
             token_counts_by_model[model_id] = _average_token_counts(token_counts)
+            weighted_ratio, excess_tokens = _weighted_ratio_and_excess_tokens(
+                token_count_by_model_text_language=token_count_by_model_text_language,
+                model_id=model_id,
+                language_code=language.code,
+            )
+            weighted_ratios_by_model[model_id] = weighted_ratio
+            excess_tokens_by_model[model_id] = excess_tokens
         rows.append(
             SummaryRow(
                 language_code=language.code,
                 language_name=language.name,
                 ratios_by_model=ratios_by_model,
                 token_counts_by_model=token_counts_by_model,
+                weighted_ratios_by_model=weighted_ratios_by_model,
+                excess_tokens_by_model=excess_tokens_by_model,
             )
         )
 
@@ -272,6 +307,15 @@ def write_summary_reports(summary: SummaryTable, output_dir: Path) -> SummaryRep
     token_count_csv_path = output_dir / "summary_token_count_by_language_model.csv"
     token_count_md_path = output_dir / "summary_token_count_by_language_model.md"
     token_count_heatmap_path = output_dir / "heatmap_token_count_language_model.csv"
+    relative_token_count_csv_path = output_dir / "summary_relative_token_count_by_language_model.csv"
+    relative_token_count_md_path = output_dir / "summary_relative_token_count_by_language_model.md"
+    relative_token_count_heatmap_path = output_dir / "heatmap_relative_token_count_language_model.csv"
+    weighted_ratio_csv_path = output_dir / "summary_weighted_ratio_by_language_model.csv"
+    weighted_ratio_md_path = output_dir / "summary_weighted_ratio_by_language_model.md"
+    weighted_ratio_heatmap_path = output_dir / "heatmap_weighted_ratio_language_model.csv"
+    excess_tokens_csv_path = output_dir / "summary_excess_tokens_by_language_model.csv"
+    excess_tokens_md_path = output_dir / "summary_excess_tokens_by_language_model.md"
+    excess_tokens_heatmap_path = output_dir / "heatmap_excess_tokens_language_model.csv"
     suite_dir = output_dir / "summaries" / safe_summary_suite_name(summary.suite_name)
     suite_csv_path = suite_dir / "summary_ratio_by_language_model.csv"
     suite_md_path = suite_dir / "summary_ratio_by_language_model.md"
@@ -279,6 +323,15 @@ def write_summary_reports(summary: SummaryTable, output_dir: Path) -> SummaryRep
     suite_token_count_csv_path = suite_dir / "summary_token_count_by_language_model.csv"
     suite_token_count_md_path = suite_dir / "summary_token_count_by_language_model.md"
     suite_token_count_heatmap_path = suite_dir / "heatmap_token_count_language_model.csv"
+    suite_relative_token_count_csv_path = suite_dir / "summary_relative_token_count_by_language_model.csv"
+    suite_relative_token_count_md_path = suite_dir / "summary_relative_token_count_by_language_model.md"
+    suite_relative_token_count_heatmap_path = suite_dir / "heatmap_relative_token_count_language_model.csv"
+    suite_weighted_ratio_csv_path = suite_dir / "summary_weighted_ratio_by_language_model.csv"
+    suite_weighted_ratio_md_path = suite_dir / "summary_weighted_ratio_by_language_model.md"
+    suite_weighted_ratio_heatmap_path = suite_dir / "heatmap_weighted_ratio_language_model.csv"
+    suite_excess_tokens_csv_path = suite_dir / "summary_excess_tokens_by_language_model.csv"
+    suite_excess_tokens_md_path = suite_dir / "summary_excess_tokens_by_language_model.md"
+    suite_excess_tokens_heatmap_path = suite_dir / "heatmap_excess_tokens_language_model.csv"
 
     _write_summary_csv(summary, csv_path)
     _write_summary_markdown(summary, md_path)
@@ -286,12 +339,30 @@ def write_summary_reports(summary: SummaryTable, output_dir: Path) -> SummaryRep
     _write_token_count_summary_csv(summary, token_count_csv_path)
     _write_token_count_summary_markdown(summary, token_count_md_path)
     _write_token_count_heatmap_csv(summary, token_count_heatmap_path)
+    _write_relative_token_count_summary_csv(summary, relative_token_count_csv_path)
+    _write_relative_token_count_summary_markdown(summary, relative_token_count_md_path)
+    _write_relative_token_count_heatmap_csv(summary, relative_token_count_heatmap_path)
+    _write_weighted_ratio_summary_csv(summary, weighted_ratio_csv_path)
+    _write_weighted_ratio_summary_markdown(summary, weighted_ratio_md_path)
+    _write_weighted_ratio_heatmap_csv(summary, weighted_ratio_heatmap_path)
+    _write_excess_tokens_summary_csv(summary, excess_tokens_csv_path)
+    _write_excess_tokens_summary_markdown(summary, excess_tokens_md_path)
+    _write_excess_tokens_heatmap_csv(summary, excess_tokens_heatmap_path)
     _write_summary_csv(summary, suite_csv_path)
     _write_summary_markdown(summary, suite_md_path)
     _write_heatmap_csv(summary, suite_heatmap_path)
     _write_token_count_summary_csv(summary, suite_token_count_csv_path)
     _write_token_count_summary_markdown(summary, suite_token_count_md_path)
     _write_token_count_heatmap_csv(summary, suite_token_count_heatmap_path)
+    _write_relative_token_count_summary_csv(summary, suite_relative_token_count_csv_path)
+    _write_relative_token_count_summary_markdown(summary, suite_relative_token_count_md_path)
+    _write_relative_token_count_heatmap_csv(summary, suite_relative_token_count_heatmap_path)
+    _write_weighted_ratio_summary_csv(summary, suite_weighted_ratio_csv_path)
+    _write_weighted_ratio_summary_markdown(summary, suite_weighted_ratio_md_path)
+    _write_weighted_ratio_heatmap_csv(summary, suite_weighted_ratio_heatmap_path)
+    _write_excess_tokens_summary_csv(summary, suite_excess_tokens_csv_path)
+    _write_excess_tokens_summary_markdown(summary, suite_excess_tokens_md_path)
+    _write_excess_tokens_heatmap_csv(summary, suite_excess_tokens_heatmap_path)
     return SummaryReportPaths(
         latest_csv=csv_path,
         latest_markdown=md_path,
@@ -299,12 +370,30 @@ def write_summary_reports(summary: SummaryTable, output_dir: Path) -> SummaryRep
         latest_token_count_csv=token_count_csv_path,
         latest_token_count_markdown=token_count_md_path,
         latest_token_count_heatmap_csv=token_count_heatmap_path,
+        latest_relative_token_count_csv=relative_token_count_csv_path,
+        latest_relative_token_count_markdown=relative_token_count_md_path,
+        latest_relative_token_count_heatmap_csv=relative_token_count_heatmap_path,
+        latest_weighted_ratio_csv=weighted_ratio_csv_path,
+        latest_weighted_ratio_markdown=weighted_ratio_md_path,
+        latest_weighted_ratio_heatmap_csv=weighted_ratio_heatmap_path,
+        latest_excess_tokens_csv=excess_tokens_csv_path,
+        latest_excess_tokens_markdown=excess_tokens_md_path,
+        latest_excess_tokens_heatmap_csv=excess_tokens_heatmap_path,
         suite_csv=suite_csv_path,
         suite_markdown=suite_md_path,
         suite_heatmap_csv=suite_heatmap_path,
         suite_token_count_csv=suite_token_count_csv_path,
         suite_token_count_markdown=suite_token_count_md_path,
         suite_token_count_heatmap_csv=suite_token_count_heatmap_path,
+        suite_relative_token_count_csv=suite_relative_token_count_csv_path,
+        suite_relative_token_count_markdown=suite_relative_token_count_md_path,
+        suite_relative_token_count_heatmap_csv=suite_relative_token_count_heatmap_path,
+        suite_weighted_ratio_csv=suite_weighted_ratio_csv_path,
+        suite_weighted_ratio_markdown=suite_weighted_ratio_md_path,
+        suite_weighted_ratio_heatmap_csv=suite_weighted_ratio_heatmap_path,
+        suite_excess_tokens_csv=suite_excess_tokens_csv_path,
+        suite_excess_tokens_markdown=suite_excess_tokens_md_path,
+        suite_excess_tokens_heatmap_csv=suite_excess_tokens_heatmap_path,
     )
 
 
@@ -359,6 +448,84 @@ def _write_token_count_summary_csv(summary: SummaryTable, path: Path) -> Path:
                 }
             )
         writer.writerow(_average_token_count_summary_row(summary))
+    return path
+
+
+def _write_relative_token_count_summary_csv(summary: SummaryTable, path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = ["language_code", "language_name", *summary.model_ids, AVG_LABEL]
+    with path.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in summary.rows:
+            writer.writerow(
+                {
+                    "language_code": row.language_code,
+                    "language_name": row.language_name,
+                    **{
+                        model_id: _format_optional_ratio(
+                            _relative_token_count_value(summary, row, model_id)
+                        )
+                        for model_id in summary.model_ids
+                    },
+                    AVG_LABEL: _format_optional_ratio(
+                        _relative_token_count_row_average(summary, row)
+                    ),
+                }
+            )
+        writer.writerow(_average_relative_token_count_summary_row(summary))
+    return path
+
+
+def _write_weighted_ratio_summary_csv(summary: SummaryTable, path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = ["language_code", "language_name", *summary.model_ids, AVG_LABEL]
+    with path.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in summary.rows:
+            writer.writerow(
+                {
+                    "language_code": row.language_code,
+                    "language_name": row.language_name,
+                    **{
+                        model_id: _format_optional_ratio(
+                            row.weighted_ratios_by_model[model_id]
+                        )
+                        for model_id in summary.model_ids
+                    },
+                    AVG_LABEL: _format_optional_ratio(
+                        _weighted_ratio_row_average(summary, row)
+                    ),
+                }
+            )
+        writer.writerow(_average_weighted_ratio_summary_row(summary))
+    return path
+
+
+def _write_excess_tokens_summary_csv(summary: SummaryTable, path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = ["language_code", "language_name", *summary.model_ids, AVG_LABEL]
+    with path.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in summary.rows:
+            writer.writerow(
+                {
+                    "language_code": row.language_code,
+                    "language_name": row.language_name,
+                    **{
+                        model_id: _format_optional_token_count(
+                            row.excess_tokens_by_model[model_id]
+                        )
+                        for model_id in summary.model_ids
+                    },
+                    AVG_LABEL: _format_optional_token_count(
+                        _excess_tokens_row_average(summary, row)
+                    ),
+                }
+            )
+        writer.writerow(_average_excess_tokens_summary_row(summary))
     return path
 
 
@@ -484,6 +651,192 @@ def _write_token_count_heatmap_csv(summary: SummaryTable, path: Path) -> Path:
     return path
 
 
+def _write_relative_token_count_heatmap_csv(summary: SummaryTable, path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "language_code",
+        "language_name",
+        "model_id",
+        "relative_token_count",
+        "is_average",
+    ]
+    with path.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in summary.rows:
+            for model_id in summary.model_ids:
+                writer.writerow(
+                    {
+                        "language_code": row.language_code,
+                        "language_name": row.language_name,
+                        "model_id": model_id,
+                        "relative_token_count": _format_optional_ratio(
+                            _relative_token_count_value(summary, row, model_id)
+                        ),
+                        "is_average": "false",
+                    }
+                )
+            writer.writerow(
+                {
+                    "language_code": row.language_code,
+                    "language_name": row.language_name,
+                    "model_id": AVG_LABEL,
+                    "relative_token_count": _format_optional_ratio(
+                        _relative_token_count_row_average(summary, row)
+                    ),
+                    "is_average": "true",
+                }
+            )
+        for model_id in summary.model_ids:
+            writer.writerow(
+                {
+                    "language_code": "avg",
+                    "language_name": AVG_LABEL,
+                    "model_id": model_id,
+                    "relative_token_count": _format_optional_ratio(
+                        _relative_token_count_model_average(summary, model_id)
+                    ),
+                    "is_average": "true",
+                }
+            )
+        writer.writerow(
+            {
+                "language_code": "avg",
+                "language_name": AVG_LABEL,
+                "model_id": AVG_LABEL,
+                "relative_token_count": _format_optional_ratio(
+                    _relative_token_count_overall_average(summary)
+                ),
+                "is_average": "true",
+            }
+        )
+    return path
+
+
+def _write_weighted_ratio_heatmap_csv(summary: SummaryTable, path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "language_code",
+        "language_name",
+        "model_id",
+        "weighted_ratio_to_english",
+        "is_average",
+    ]
+    with path.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in summary.rows:
+            for model_id in summary.model_ids:
+                writer.writerow(
+                    {
+                        "language_code": row.language_code,
+                        "language_name": row.language_name,
+                        "model_id": model_id,
+                        "weighted_ratio_to_english": _format_optional_ratio(
+                            row.weighted_ratios_by_model[model_id]
+                        ),
+                        "is_average": "false",
+                    }
+                )
+            writer.writerow(
+                {
+                    "language_code": row.language_code,
+                    "language_name": row.language_name,
+                    "model_id": AVG_LABEL,
+                    "weighted_ratio_to_english": _format_optional_ratio(
+                        _weighted_ratio_row_average(summary, row)
+                    ),
+                    "is_average": "true",
+                }
+            )
+        for model_id in summary.model_ids:
+            writer.writerow(
+                {
+                    "language_code": "avg",
+                    "language_name": AVG_LABEL,
+                    "model_id": model_id,
+                    "weighted_ratio_to_english": _format_optional_ratio(
+                        _weighted_ratio_model_average(summary, model_id)
+                    ),
+                    "is_average": "true",
+                }
+            )
+        writer.writerow(
+            {
+                "language_code": "avg",
+                "language_name": AVG_LABEL,
+                "model_id": AVG_LABEL,
+                "weighted_ratio_to_english": _format_optional_ratio(
+                    _weighted_ratio_overall_average(summary)
+                ),
+                "is_average": "true",
+            }
+        )
+    return path
+
+
+def _write_excess_tokens_heatmap_csv(summary: SummaryTable, path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "language_code",
+        "language_name",
+        "model_id",
+        "excess_tokens_vs_english",
+        "is_average",
+    ]
+    with path.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in summary.rows:
+            for model_id in summary.model_ids:
+                writer.writerow(
+                    {
+                        "language_code": row.language_code,
+                        "language_name": row.language_name,
+                        "model_id": model_id,
+                        "excess_tokens_vs_english": _format_optional_token_count(
+                            row.excess_tokens_by_model[model_id]
+                        ),
+                        "is_average": "false",
+                    }
+                )
+            writer.writerow(
+                {
+                    "language_code": row.language_code,
+                    "language_name": row.language_name,
+                    "model_id": AVG_LABEL,
+                    "excess_tokens_vs_english": _format_optional_token_count(
+                        _excess_tokens_row_average(summary, row)
+                    ),
+                    "is_average": "true",
+                }
+            )
+        for model_id in summary.model_ids:
+            writer.writerow(
+                {
+                    "language_code": "avg",
+                    "language_name": AVG_LABEL,
+                    "model_id": model_id,
+                    "excess_tokens_vs_english": _format_optional_token_count(
+                        _excess_tokens_model_average(summary, model_id)
+                    ),
+                    "is_average": "true",
+                }
+            )
+        writer.writerow(
+            {
+                "language_code": "avg",
+                "language_name": AVG_LABEL,
+                "model_id": AVG_LABEL,
+                "excess_tokens_vs_english": _format_optional_token_count(
+                    _excess_tokens_overall_average(summary)
+                ),
+                "is_average": "true",
+            }
+        )
+    return path
+
+
 def _write_summary_markdown(summary: SummaryTable, path: Path) -> Path:
     lines = [
         "# Language Token Efficiency Benchmark Summary",
@@ -595,6 +948,194 @@ def _write_token_count_summary_markdown(summary: SummaryTable, path: Path) -> Pa
             "",
             "Values are average observed input prompt token counts by language and model across saved text records.",
             "They show absolute prompt size, not the ratio to English.",
+        ]
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def _write_relative_token_count_summary_markdown(summary: SummaryTable, path: Path) -> Path:
+    lines = [
+        "# Language Token Efficiency Benchmark Relative Token Count Summary",
+        "",
+        f"Suite: `{summary.suite_name}`",
+        "",
+        "| Language Code | Language Name | "
+        + " | ".join(summary.model_ids)
+        + f" | {AVG_LABEL} |",
+        "| --- | --- | "
+        + " | ".join("---:" for _ in [*summary.model_ids, AVG_LABEL])
+        + " |",
+    ]
+    for row in summary.rows:
+        lines.append(
+            "| {code} | {name} | {values} |".format(
+                code=row.language_code,
+                name=row.language_name,
+                values=" | ".join(
+                    [
+                        *(
+                            _format_markdown_ratio(
+                                _relative_token_count_value(summary, row, model_id)
+                            )
+                            for model_id in summary.model_ids
+                        ),
+                        _format_markdown_ratio(
+                            _relative_token_count_row_average(summary, row)
+                        ),
+                    ]
+                ),
+            )
+        )
+    lines.append(
+        "| {code} | {name} | {values} |".format(
+            code="avg",
+            name=AVG_LABEL,
+            values=" | ".join(
+                [
+                    *(
+                        _format_markdown_ratio(
+                            _relative_token_count_model_average(summary, model_id)
+                        )
+                        for model_id in summary.model_ids
+                    ),
+                    _format_markdown_ratio(_relative_token_count_overall_average(summary)),
+                ]
+            ),
+        )
+    )
+    lines.extend(
+        [
+            "",
+            "Values are average observed input prompt token counts normalized by the minimum cell in this summary table.",
+            "`1.00x` means the lowest-token language/model cell in the table; larger values show relative input token volume.",
+        ]
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def _write_weighted_ratio_summary_markdown(summary: SummaryTable, path: Path) -> Path:
+    lines = [
+        "# Language Token Efficiency Benchmark Weighted Ratio Summary",
+        "",
+        f"Suite: `{summary.suite_name}`",
+        "",
+        "| Language Code | Language Name | "
+        + " | ".join(summary.model_ids)
+        + f" | {AVG_LABEL} |",
+        "| --- | --- | "
+        + " | ".join("---:" for _ in [*summary.model_ids, AVG_LABEL])
+        + " |",
+    ]
+    for row in summary.rows:
+        lines.append(
+            "| {code} | {name} | {values} |".format(
+                code=row.language_code,
+                name=row.language_name,
+                values=" | ".join(
+                    [
+                        *(
+                            _format_markdown_ratio(
+                                row.weighted_ratios_by_model[model_id]
+                            )
+                            for model_id in summary.model_ids
+                        ),
+                        _format_markdown_ratio(
+                            _weighted_ratio_row_average(summary, row)
+                        ),
+                    ]
+                ),
+            )
+        )
+    lines.append(
+        "| {code} | {name} | {values} |".format(
+            code="avg",
+            name=AVG_LABEL,
+            values=" | ".join(
+                [
+                    *(
+                        _format_markdown_ratio(
+                            _weighted_ratio_model_average(summary, model_id)
+                        )
+                        for model_id in summary.model_ids
+                    ),
+                    _format_markdown_ratio(_weighted_ratio_overall_average(summary)),
+                ]
+            ),
+        )
+    )
+    lines.extend(
+        [
+            "",
+            "Values are weighted `ratio_to_english` by language and model.",
+            "They are calculated as total language prompt tokens divided by total English prompt tokens across saved text records.",
+            "Average rows exclude English so the baseline does not dilute non-English differences.",
+        ]
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def _write_excess_tokens_summary_markdown(summary: SummaryTable, path: Path) -> Path:
+    lines = [
+        "# Language Token Efficiency Benchmark Excess Token Summary",
+        "",
+        f"Suite: `{summary.suite_name}`",
+        "",
+        "| Language Code | Language Name | "
+        + " | ".join(summary.model_ids)
+        + f" | {AVG_LABEL} |",
+        "| --- | --- | "
+        + " | ".join("---:" for _ in [*summary.model_ids, AVG_LABEL])
+        + " |",
+    ]
+    for row in summary.rows:
+        lines.append(
+            "| {code} | {name} | {values} |".format(
+                code=row.language_code,
+                name=row.language_name,
+                values=" | ".join(
+                    [
+                        *(
+                            _format_markdown_excess_tokens(
+                                row.excess_tokens_by_model[model_id]
+                            )
+                            for model_id in summary.model_ids
+                        ),
+                        _format_markdown_excess_tokens(
+                            _excess_tokens_row_average(summary, row)
+                        ),
+                    ]
+                ),
+            )
+        )
+    lines.append(
+        "| {code} | {name} | {values} |".format(
+            code="avg",
+            name=AVG_LABEL,
+            values=" | ".join(
+                [
+                    *(
+                        _format_markdown_excess_tokens(
+                            _excess_tokens_model_average(summary, model_id)
+                        )
+                        for model_id in summary.model_ids
+                    ),
+                    _format_markdown_excess_tokens(_excess_tokens_overall_average(summary)),
+                ]
+            ),
+        )
+    )
+    lines.extend(
+        [
+            "",
+            "Values are total observed input prompt tokens minus the matching English total across saved text records.",
+            "Positive values mean more input tokens than English; negative values mean fewer input tokens than English.",
+            "Average rows exclude English so the zero baseline does not dilute non-English differences.",
         ]
     )
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -736,6 +1277,14 @@ def _format_markdown_token_count(value: float | None) -> str:
     return f"{value:,.0f}"
 
 
+def _format_markdown_excess_tokens(value: float | None) -> str:
+    if value is None:
+        return ""
+    if value > 0:
+        return f"+{value:,.0f}"
+    return f"{value:,.0f}"
+
+
 def _average_summary_row(summary: SummaryTable) -> dict[str, str]:
     return {
         "language_code": "avg",
@@ -759,6 +1308,48 @@ def _average_token_count_summary_row(summary: SummaryTable) -> dict[str, str]:
             for model_id in summary.model_ids
         },
         AVG_LABEL: _format_optional_token_count(_token_count_overall_average(summary)),
+    }
+
+
+def _average_relative_token_count_summary_row(summary: SummaryTable) -> dict[str, str]:
+    return {
+        "language_code": "avg",
+        "language_name": AVG_LABEL,
+        **{
+            model_id: _format_optional_ratio(
+                _relative_token_count_model_average(summary, model_id)
+            )
+            for model_id in summary.model_ids
+        },
+        AVG_LABEL: _format_optional_ratio(_relative_token_count_overall_average(summary)),
+    }
+
+
+def _average_weighted_ratio_summary_row(summary: SummaryTable) -> dict[str, str]:
+    return {
+        "language_code": "avg",
+        "language_name": AVG_LABEL,
+        **{
+            model_id: _format_optional_ratio(
+                _weighted_ratio_model_average(summary, model_id)
+            )
+            for model_id in summary.model_ids
+        },
+        AVG_LABEL: _format_optional_ratio(_weighted_ratio_overall_average(summary)),
+    }
+
+
+def _average_excess_tokens_summary_row(summary: SummaryTable) -> dict[str, str]:
+    return {
+        "language_code": "avg",
+        "language_name": AVG_LABEL,
+        **{
+            model_id: _format_optional_token_count(
+                _excess_tokens_model_average(summary, model_id)
+            )
+            for model_id in summary.model_ids
+        },
+        AVG_LABEL: _format_optional_token_count(_excess_tokens_overall_average(summary)),
     }
 
 
@@ -801,6 +1392,111 @@ def _token_count_overall_average(summary: SummaryTable) -> float | None:
     return _average(values)
 
 
+def _relative_token_count_value(
+    summary: SummaryTable,
+    row: SummaryRow,
+    model_id: str,
+) -> float | None:
+    minimum = _minimum_token_count(summary)
+    value = row.token_counts_by_model[model_id]
+    if minimum is None or minimum == 0 or value is None:
+        return None
+    return round(value / minimum, 6)
+
+
+def _relative_token_count_row_average(
+    summary: SummaryTable,
+    row: SummaryRow,
+) -> float | None:
+    values = [
+        _relative_token_count_value(summary, row, model_id)
+        for model_id in summary.model_ids
+    ]
+    return _average(values)
+
+
+def _relative_token_count_model_average(
+    summary: SummaryTable,
+    model_id: str,
+) -> float | None:
+    values = [
+        _relative_token_count_value(summary, row, model_id)
+        for row in summary.rows
+    ]
+    return _average(values)
+
+
+def _relative_token_count_overall_average(summary: SummaryTable) -> float | None:
+    values = [
+        _relative_token_count_value(summary, row, model_id)
+        for row in summary.rows
+        for model_id in summary.model_ids
+    ]
+    return _average(values)
+
+
+def _weighted_ratio_row_average(summary: SummaryTable, row: SummaryRow) -> float | None:
+    if row.language_code == "en":
+        return 1.0
+    values = [
+        row.weighted_ratios_by_model[model_id]
+        for model_id in summary.model_ids
+        if row.weighted_ratios_by_model[model_id] is not None
+    ]
+    return _average(values)
+
+
+def _weighted_ratio_model_average(summary: SummaryTable, model_id: str) -> float | None:
+    values = [
+        row.weighted_ratios_by_model[model_id]
+        for row in summary.rows
+        if row.language_code != "en"
+        and row.weighted_ratios_by_model[model_id] is not None
+    ]
+    return _average(values)
+
+
+def _weighted_ratio_overall_average(summary: SummaryTable) -> float | None:
+    values = [
+        row.weighted_ratios_by_model[model_id]
+        for row in summary.rows
+        for model_id in summary.model_ids
+        if row.language_code != "en"
+        and row.weighted_ratios_by_model[model_id] is not None
+    ]
+    return _average(values)
+
+
+def _excess_tokens_row_average(summary: SummaryTable, row: SummaryRow) -> float | None:
+    values = [
+        row.excess_tokens_by_model[model_id]
+        for model_id in summary.model_ids
+        if row.excess_tokens_by_model[model_id] is not None
+    ]
+    return _average(values)
+
+
+def _excess_tokens_model_average(summary: SummaryTable, model_id: str) -> float | None:
+    values = [
+        row.excess_tokens_by_model[model_id]
+        for row in summary.rows
+        if row.language_code != "en"
+        and row.excess_tokens_by_model[model_id] is not None
+    ]
+    return _average(values)
+
+
+def _excess_tokens_overall_average(summary: SummaryTable) -> float | None:
+    values = [
+        row.excess_tokens_by_model[model_id]
+        for row in summary.rows
+        for model_id in summary.model_ids
+        if row.language_code != "en"
+        and row.excess_tokens_by_model[model_id] is not None
+    ]
+    return _average(values)
+
+
 def _model_average(summary: SummaryTable, model_id: str) -> float | None:
     values = [
         row.ratios_by_model[model_id]
@@ -831,3 +1527,41 @@ def _average_token_counts(values: list[int]) -> float | None:
     if not values:
         return None
     return round(sum(values) / len(values), 6)
+
+
+def _minimum_token_count(summary: SummaryTable) -> float | None:
+    values = [
+        row.token_counts_by_model[model_id]
+        for row in summary.rows
+        for model_id in summary.model_ids
+        if row.token_counts_by_model[model_id] is not None
+    ]
+    if not values:
+        return None
+    return min(values)
+
+
+def _weighted_ratio_and_excess_tokens(
+    *,
+    token_count_by_model_text_language: dict[tuple[str, str, str], int],
+    model_id: str,
+    language_code: str,
+) -> tuple[float | None, float | None]:
+    language_total = 0
+    english_total = 0
+    for key, token_count in token_count_by_model_text_language.items():
+        key_model_id, text_id, key_language_code = key
+        if key_model_id != model_id or key_language_code != language_code:
+            continue
+        english_count = token_count_by_model_text_language.get((model_id, text_id, "en"))
+        if english_count is None:
+            continue
+        language_total += token_count
+        english_total += english_count
+
+    if english_total == 0:
+        return None, None
+
+    weighted_ratio = round(language_total / english_total, 6)
+    excess_tokens = float(language_total - english_total)
+    return weighted_ratio, excess_tokens

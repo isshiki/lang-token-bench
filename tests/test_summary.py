@@ -82,6 +82,15 @@ def test_summarize_command_writes_suite_outputs(tmp_path) -> None:
     token_count_csv = tmp_path / "summary_token_count_by_language_model.csv"
     token_count_md = tmp_path / "summary_token_count_by_language_model.md"
     token_count_heatmap_csv = tmp_path / "heatmap_token_count_language_model.csv"
+    relative_token_count_csv = tmp_path / "summary_relative_token_count_by_language_model.csv"
+    relative_token_count_md = tmp_path / "summary_relative_token_count_by_language_model.md"
+    relative_token_count_heatmap_csv = tmp_path / "heatmap_relative_token_count_language_model.csv"
+    weighted_ratio_csv = tmp_path / "summary_weighted_ratio_by_language_model.csv"
+    weighted_ratio_md = tmp_path / "summary_weighted_ratio_by_language_model.md"
+    weighted_ratio_heatmap_csv = tmp_path / "heatmap_weighted_ratio_language_model.csv"
+    excess_tokens_csv = tmp_path / "summary_excess_tokens_by_language_model.csv"
+    excess_tokens_md = tmp_path / "summary_excess_tokens_by_language_model.md"
+    excess_tokens_heatmap_csv = tmp_path / "heatmap_excess_tokens_language_model.csv"
     suite_summary_dir = tmp_path / "summaries" / "test_suite"
     suite_summary_csv = suite_summary_dir / "summary_ratio_by_language_model.csv"
     suite_summary_md = suite_summary_dir / "summary_ratio_by_language_model.md"
@@ -89,18 +98,45 @@ def test_summarize_command_writes_suite_outputs(tmp_path) -> None:
     suite_token_count_csv = suite_summary_dir / "summary_token_count_by_language_model.csv"
     suite_token_count_md = suite_summary_dir / "summary_token_count_by_language_model.md"
     suite_token_count_heatmap_csv = suite_summary_dir / "heatmap_token_count_language_model.csv"
+    suite_relative_token_count_csv = suite_summary_dir / "summary_relative_token_count_by_language_model.csv"
+    suite_relative_token_count_md = suite_summary_dir / "summary_relative_token_count_by_language_model.md"
+    suite_relative_token_count_heatmap_csv = suite_summary_dir / "heatmap_relative_token_count_language_model.csv"
+    suite_weighted_ratio_csv = suite_summary_dir / "summary_weighted_ratio_by_language_model.csv"
+    suite_weighted_ratio_md = suite_summary_dir / "summary_weighted_ratio_by_language_model.md"
+    suite_weighted_ratio_heatmap_csv = suite_summary_dir / "heatmap_weighted_ratio_language_model.csv"
+    suite_excess_tokens_csv = suite_summary_dir / "summary_excess_tokens_by_language_model.csv"
+    suite_excess_tokens_md = suite_summary_dir / "summary_excess_tokens_by_language_model.md"
+    suite_excess_tokens_heatmap_csv = suite_summary_dir / "heatmap_excess_tokens_language_model.csv"
     assert summary_csv.exists()
     assert summary_md.exists()
     assert heatmap_csv.exists()
     assert token_count_csv.exists()
     assert token_count_md.exists()
     assert token_count_heatmap_csv.exists()
+    assert relative_token_count_csv.exists()
+    assert relative_token_count_md.exists()
+    assert relative_token_count_heatmap_csv.exists()
+    assert weighted_ratio_csv.exists()
+    assert weighted_ratio_md.exists()
+    assert weighted_ratio_heatmap_csv.exists()
+    assert excess_tokens_csv.exists()
+    assert excess_tokens_md.exists()
+    assert excess_tokens_heatmap_csv.exists()
     assert suite_summary_csv.exists()
     assert suite_summary_md.exists()
     assert suite_heatmap_csv.exists()
     assert suite_token_count_csv.exists()
     assert suite_token_count_md.exists()
     assert suite_token_count_heatmap_csv.exists()
+    assert suite_relative_token_count_csv.exists()
+    assert suite_relative_token_count_md.exists()
+    assert suite_relative_token_count_heatmap_csv.exists()
+    assert suite_weighted_ratio_csv.exists()
+    assert suite_weighted_ratio_md.exists()
+    assert suite_weighted_ratio_heatmap_csv.exists()
+    assert suite_excess_tokens_csv.exists()
+    assert suite_excess_tokens_md.exists()
+    assert suite_excess_tokens_heatmap_csv.exists()
 
     with summary_csv.open("r", encoding="utf-8", newline="") as file:
         rows = list(csv.DictReader(file))
@@ -167,6 +203,45 @@ def test_summarize_command_writes_suite_outputs(tmp_path) -> None:
         for row in heatmap_rows
     )
 
+    with relative_token_count_heatmap_csv.open("r", encoding="utf-8", newline="") as file:
+        relative_token_count_heatmap_rows = list(csv.DictReader(file))
+    assert {
+        "language_code",
+        "language_name",
+        "model_id",
+        "relative_token_count",
+        "is_average",
+    } == set(relative_token_count_heatmap_rows[0])
+    assert "minimum cell in this summary table" in relative_token_count_md.read_text(
+        encoding="utf-8"
+    )
+
+    with weighted_ratio_heatmap_csv.open("r", encoding="utf-8", newline="") as file:
+        weighted_ratio_heatmap_rows = list(csv.DictReader(file))
+    assert {
+        "language_code",
+        "language_name",
+        "model_id",
+        "weighted_ratio_to_english",
+        "is_average",
+    } == set(weighted_ratio_heatmap_rows[0])
+    assert "weighted `ratio_to_english`" in weighted_ratio_md.read_text(
+        encoding="utf-8"
+    )
+
+    with excess_tokens_heatmap_csv.open("r", encoding="utf-8", newline="") as file:
+        excess_tokens_heatmap_rows = list(csv.DictReader(file))
+    assert {
+        "language_code",
+        "language_name",
+        "model_id",
+        "excess_tokens_vs_english",
+        "is_average",
+    } == set(excess_tokens_heatmap_rows[0])
+    assert "minus the matching English total" in excess_tokens_md.read_text(
+        encoding="utf-8"
+    )
+
 
 def test_summarize_command_falls_back_to_latest_results(tmp_path) -> None:
     suite_path = tmp_path / "benchmark_suites.yaml"
@@ -190,6 +265,9 @@ def test_summarize_command_falls_back_to_latest_results(tmp_path) -> None:
     assert exit_code == 0
     assert (tmp_path / "summary_ratio_by_language_model.csv").exists()
     assert (tmp_path / "summary_token_count_by_language_model.csv").exists()
+    assert (tmp_path / "summary_relative_token_count_by_language_model.csv").exists()
+    assert (tmp_path / "summary_weighted_ratio_by_language_model.csv").exists()
+    assert (tmp_path / "summary_excess_tokens_by_language_model.csv").exists()
     assert (
         tmp_path
         / "summaries"
@@ -202,6 +280,110 @@ def test_summarize_command_falls_back_to_latest_results(tmp_path) -> None:
         / "test_suite"
         / "summary_token_count_by_language_model.csv"
     ).exists()
+    assert (
+        tmp_path
+        / "summaries"
+        / "test_suite"
+        / "summary_relative_token_count_by_language_model.csv"
+    ).exists()
+    assert (
+        tmp_path
+        / "summaries"
+        / "test_suite"
+        / "summary_weighted_ratio_by_language_model.csv"
+    ).exists()
+    assert (
+        tmp_path
+        / "summaries"
+        / "test_suite"
+        / "summary_excess_tokens_by_language_model.csv"
+    ).exists()
+
+
+def test_summarize_writes_weighted_ratio_and_excess_token_values(tmp_path) -> None:
+    suite_path = tmp_path / "benchmark_suites.yaml"
+    suite_path.write_text(
+        "\n".join(
+            [
+                "suites:",
+                "  - name: test_suite",
+                "    description: Test suite",
+                "    model_ids:",
+                "      - model/a",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    write_csv_report(
+        [
+            _benchmark_result(
+                model_id="model/a",
+                text_id="sample_a",
+                language_code="en",
+                token_count=10,
+                timestamp_utc="2026-04-29T00:00:00Z",
+            ),
+            _benchmark_result(
+                model_id="model/a",
+                text_id="sample_a",
+                language_code="ja",
+                token_count=20,
+                timestamp_utc="2026-04-29T00:00:01Z",
+            ),
+            _benchmark_result(
+                model_id="model/a",
+                text_id="sample_b",
+                language_code="en",
+                token_count=20,
+                timestamp_utc="2026-04-29T00:00:02Z",
+            ),
+            _benchmark_result(
+                model_id="model/a",
+                text_id="sample_b",
+                language_code="ja",
+                token_count=30,
+                timestamp_utc="2026-04-29T00:00:03Z",
+            ),
+        ],
+        tmp_path / "runs" / "20260429T000000_model-a" / "results.csv",
+    )
+
+    exit_code = main(
+        [
+            "summarize",
+            "--suite",
+            "test_suite",
+            "--suites",
+            str(suite_path),
+            "--output-dir",
+            str(tmp_path),
+        ],
+        load_env=False,
+    )
+
+    assert exit_code == 0
+    with (
+        tmp_path / "summary_relative_token_count_by_language_model.csv"
+    ).open("r", encoding="utf-8", newline="") as file:
+        relative_rows = list(csv.DictReader(file))
+    with (
+        tmp_path / "summary_weighted_ratio_by_language_model.csv"
+    ).open("r", encoding="utf-8", newline="") as file:
+        weighted_rows = list(csv.DictReader(file))
+    with (
+        tmp_path / "summary_excess_tokens_by_language_model.csv"
+    ).open("r", encoding="utf-8", newline="") as file:
+        excess_rows = list(csv.DictReader(file))
+
+    japanese_relative = next(row for row in relative_rows if row["language_code"] == "ja")
+    japanese_weighted = next(row for row in weighted_rows if row["language_code"] == "ja")
+    japanese_excess = next(row for row in excess_rows if row["language_code"] == "ja")
+    english_excess = next(row for row in excess_rows if row["language_code"] == "en")
+    assert japanese_relative["model/a"] == "1.666667"
+    assert japanese_weighted["model/a"] == "1.666667"
+    assert japanese_excess["model/a"] == "20"
+    assert english_excess["model/a"] == "0"
 
 
 def test_summarize_suite_name_is_sanitized_for_output_path(tmp_path) -> None:
@@ -249,6 +431,24 @@ def test_summarize_suite_name_is_sanitized_for_output_path(tmp_path) -> None:
         / "summaries"
         / safe_name
         / "summary_token_count_by_language_model.csv"
+    ).exists()
+    assert (
+        tmp_path
+        / "summaries"
+        / safe_name
+        / "summary_relative_token_count_by_language_model.csv"
+    ).exists()
+    assert (
+        tmp_path
+        / "summaries"
+        / safe_name
+        / "summary_weighted_ratio_by_language_model.csv"
+    ).exists()
+    assert (
+        tmp_path
+        / "summaries"
+        / safe_name
+        / "summary_excess_tokens_by_language_model.csv"
     ).exists()
     assert not (tmp_path / "summaries" / "unsafe").exists()
 
