@@ -80,12 +80,14 @@ def test_benchmark_suites_load_expected_model_groups() -> None:
         "public_comparison_2026_04",
         "all_2026_04",
         "anthropic_comparison_2026_05",
+        "gpt_comparison_2026_05",
     }
     main = load_benchmark_suite("main_2026_04")
     budget = load_benchmark_suite("budget_2026_04")
     all_suite = load_benchmark_suite("all_2026_04")
     public = load_benchmark_suite("public_comparison_2026_04")
     anthropic = load_benchmark_suite("anthropic_comparison_2026_05")
+    gpt = load_benchmark_suite("gpt_comparison_2026_05")
     assert "openai/gpt-4o-mini" in budget.model_ids
     assert budget.model_ids
     expected_all = list(dict.fromkeys([*main.model_ids, *budget.model_ids]))
@@ -102,3 +104,11 @@ def test_benchmark_suites_load_expected_model_groups() -> None:
         "anthropic/claude-opus-4.7",
     ]
     assert anthropic.charts[0].id == "anthropic_opus46_vs_opus47_bar"
+    assert gpt.model_ids == [
+        "openai/gpt-5.4",
+        "openai/gpt-5.5",
+        "openai/gpt-4o-mini",
+        "openai/gpt-oss-120b",
+    ]
+    assert gpt.charts[0].id == "gpt54_vs_gpt55_bar"
+    assert gpt.charts[1].id == "gpt4o_mini_vs_gpt_oss120b_bar"

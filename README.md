@@ -72,6 +72,7 @@ check OpenRouter credits before and after the benchmark.
 | --- | --- |
 | `public_comparison_2026_04` | Main public-facing comparison and figures |
 | `anthropic_comparison_2026_05` | Anthropic-only comparison across Haiku, Sonnet, Opus 4.6, and Opus 4.7 |
+| `gpt_comparison_2026_05` | GPT-family comparison across GPT-5.4, GPT-5.5, GPT-4o mini, and GPT OSS 120B |
 | `all_2026_04` | All measured models, including extra comparisons |
 | `budget_2026_04` | Low-cost model checks |
 | `main_2026_04` | Major model candidates |
